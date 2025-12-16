@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -43,6 +43,11 @@ export default function NewDUPATemplatePage() {
   const [equipmentTemplate, setEquipmentTemplate] = useState<EquipmentEntry[]>([]);
   const [materialTemplate, setMaterialTemplate] = useState<MaterialEntry[]>([]);
 
+  // Master data for dropdowns
+  const [equipmentOptions, setEquipmentOptions] = useState<Array<{ _id: string; description: string }>>([]);
+  const [materialOptions, setMaterialOptions] = useState<Array<{ materialCode: string; description: string; unit: string }>>([]);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+
   // Add-ons
   const [ocmPercentage, setOcmPercentage] = useState(10);
   const [cpPercentage, setCpPercentage] = useState(8);
@@ -51,6 +56,29 @@ export default function NewDUPATemplatePage() {
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const loadMasterData = async () => {
+      try {
+        const [eqRes, matRes] = await Promise.all([
+          fetch('/api/master/equipment'),
+          fetch('/api/master/materials')
+        ]);
+        const [eqJson, matJson] = await Promise.all([eqRes.json(), matRes.json()]);
+        if (eqJson.success) {
+          setEquipmentOptions(eqJson.data.map((e: any) => ({ _id: e._id, description: e.description })));
+        }
+        if (matJson.success) {
+          setMaterialOptions(matJson.data.map((m: any) => ({ materialCode: m.materialCode, description: m.description, unit: m.unit })));
+        }
+      } catch (e) {
+        console.error('Failed to load master data', e);
+      } finally {
+        setLoadingOptions(false);
+      }
+    };
+    loadMasterData();
+  }, []);
 
   // Labor handlers
   const addLaborEntry = () => {
@@ -425,78 +453,84 @@ export default function NewDUPATemplatePage() {
             {equipmentTemplate.length === 0 ? (
               <p className="text-gray-500">No equipment entries. Click "Add Equipment" to begin.</p>
             ) : (
-              <div className="space-y-4">
-                {equipmentTemplate.map((equip, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Description
-                        </label>
-                        <input
-                          type="text"
-                          value={equip.description}
-                          onChange={(e) =>
-                            updateEquipmentEntry(index, 'description', e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="Equipment description"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          No. of Units
-                        </label>
-                        <input
-                          type="number"
-                          value={equip.noOfUnits}
-                          onChange={(e) =>
-                            updateEquipmentEntry(index, 'noOfUnits', Number(e.target.value))
-                          }
-                          min="0.1"
-                          step="0.1"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          No. of Hours
-                        </label>
-                        <input
-                          type="number"
-                          value={equip.noOfHours}
-                          onChange={(e) =>
-                            updateEquipmentEntry(index, 'noOfHours', Number(e.target.value))
-                          }
-                          min="0.1"
-                          step="0.1"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Equipment ID (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={equip.equipmentId}
-                        onChange={(e) =>
-                          updateEquipmentEntry(index, 'equipmentId', e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Link to equipment database"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeEquipmentEntry(index)}
-                      className="mt-2 text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Equipment
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Units
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Hours
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {equipmentTemplate.map((equip, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {loadingOptions ? (
+                            <div className="text-gray-500">Loading equipment...</div>
+                          ) : (
+                            <select
+                              value={equip.equipmentId}
+                              onChange={(e) => {
+                                const selected = equipmentOptions.find(o => o._id === e.target.value);
+                                updateEquipmentEntry(index, 'equipmentId', e.target.value);
+                                updateEquipmentEntry(index, 'description', selected ? selected.description : '');
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">Select equipment</option>
+                              {equipmentOptions.map((opt) => (
+                                <option key={opt._id} value={opt._id}>{opt.description}</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="number"
+                            value={equip.noOfUnits}
+                            onChange={(e) =>
+                              updateEquipmentEntry(index, 'noOfUnits', Number(e.target.value))
+                            }
+                            min="0.1"
+                            step="0.1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="number"
+                            value={equip.noOfHours}
+                            onChange={(e) =>
+                              updateEquipmentEntry(index, 'noOfHours', Number(e.target.value))
+                            }
+                            min="0.1"
+                            step="0.1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            type="button"
+                            onClick={() => removeEquipmentEntry(index)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -517,75 +551,82 @@ export default function NewDUPATemplatePage() {
             {materialTemplate.length === 0 ? (
               <p className="text-gray-500">No material entries. Click "Add Material" to begin.</p>
             ) : (
-              <div className="space-y-4">
-                {materialTemplate.map((material, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Description
-                        </label>
-                        <input
-                          type="text"
-                          value={material.description}
-                          onChange={(e) =>
-                            updateMaterialEntry(index, 'description', e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="Material description"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Unit
-                        </label>
-                        <input
-                          type="text"
-                          value={material.unit}
-                          onChange={(e) => updateMaterialEntry(index, 'unit', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="e.g., kg, bag, cu.m."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Quantity
-                        </label>
-                        <input
-                          type="number"
-                          value={material.quantity}
-                          onChange={(e) =>
-                            updateMaterialEntry(index, 'quantity', Number(e.target.value))
-                          }
-                          min="0.01"
-                          step="0.01"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Material Code (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={material.materialCode}
-                        onChange={(e) =>
-                          updateMaterialEntry(index, 'materialCode', e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Link to material database"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeMaterialEntry(index)}
-                      className="mt-2 text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Material
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Unit
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Quantity
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {materialTemplate.map((material, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {loadingOptions ? (
+                            <div className="text-gray-500">Loading materials...</div>
+                          ) : (
+                            <select
+                              value={material.materialCode}
+                              onChange={(e) => {
+                                const selected = materialOptions.find(o => o.materialCode === e.target.value);
+                                updateMaterialEntry(index, 'materialCode', e.target.value);
+                                updateMaterialEntry(index, 'description', selected ? selected.description : '');
+                                updateMaterialEntry(index, 'unit', selected ? selected.unit : '');
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">Select material</option>
+                              {materialOptions.map((opt) => (
+                                <option key={opt.materialCode} value={opt.materialCode}>{opt.description} ({opt.materialCode})</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="text"
+                            value={material.unit}
+                            onChange={(e) => updateMaterialEntry(index, 'unit', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="e.g., kg, bag, cu.m."
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="number"
+                            value={material.quantity}
+                            onChange={(e) =>
+                              updateMaterialEntry(index, 'quantity', Number(e.target.value))
+                            }
+                            min="0.01"
+                            step="0.01"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            type="button"
+                            onClick={() => removeMaterialEntry(index)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
