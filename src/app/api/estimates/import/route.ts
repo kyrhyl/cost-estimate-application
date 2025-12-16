@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/db/connect';
 import Estimate from '@/models/Estimate';
 import RateItem from '@/models/RateItem';
-import { computeLineItemEstimate } from '@/lib/pricing-engine';
+import { computeLineItemEstimate } from '@/lib/calc/estimate';
 import { IBOQLine } from '@/models/Estimate';
+import { ImportBoqSchema, validateInput } from '@/lib/validation/schemas';
 
 // =============================================
 // POST /api/estimates/import
@@ -34,22 +35,25 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
     
-    const body: ImportBOQRequest = await request.json();
+    const body = await request.json();
     
-    // Validate required fields
-    if (!body.projectName || !body.projectLocation || !body.implementingOffice) {
+    // ============================================================================
+    // STEP 1: Validate input with Zod
+    // ============================================================================
+    const validation = validateInput(ImportBoqSchema, body);
+    
+    if (!validation.success) {
       return NextResponse.json(
-        { success: false, error: 'Missing required project information' },
+        { 
+          success: false, 
+          error: 'Invalid BOQ data', 
+          details: validation.errors 
+        },
         { status: 400 }
       );
     }
     
-    if (!body.boqLines || body.boqLines.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'BOQ lines are required' },
-        { status: 400 }
-      );
-    }
+    const validatedData = validation.data;
     
     const useEvaluated = body.useEvaluated || false;
     
@@ -65,7 +69,7 @@ export async function POST(request: NextRequest) {
     let totalVATSubmitted = 0;
     let totalVATEvaluated = 0;
     
-    for (const line of body.boqLines) {
+    for (const line of validatedData.boqLines) {
       // Try to find matching rate item
       let rateItem = null;
       
@@ -149,11 +153,11 @@ export async function POST(request: NextRequest) {
     const grandTotalSubmitted = totalDirectCostSubmitted + totalOCMSubmitted + totalCPSubmitted + totalVATSubmitted;
     const grandTotalEvaluated = totalDirectCostEvaluated + totalOCMEvaluated + totalCPEvaluated + totalVATEvaluated;
     
-    // Create estimate document
+    // Create estimate document using validated data
     const estimate = await Estimate.create({
-      projectName: body.projectName,
-      projectLocation: body.projectLocation,
-      implementingOffice: body.implementingOffice,
+      projectName: validatedData.projectName,
+      projectLocation: validatedData.projectLocation,
+      implementingOffice: validatedData.implementingOffice,
       boqLines: processedLines,
       totalDirectCostSubmitted,
       totalDirectCostEvaluated,

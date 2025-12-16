@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/db/connect';
 import Project from '@/models/Project';
+import { CreateProjectSchema, validateInput } from '@/lib/validation/schemas';
 
 // GET /api/projects - List all projects
 export async function GET(request: NextRequest) {
@@ -30,7 +31,21 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json();
     
-    const project = await Project.create(body);
+    // Validate input with Zod
+    const validation = validateInput(CreateProjectSchema, body);
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Invalid project data', 
+          details: validation.errors 
+        },
+        { status: 400 }
+      );
+    }
+    
+    const project = await Project.create(validation.data);
     
     return NextResponse.json({
       success: true,
