@@ -28,6 +28,46 @@ export interface IProject extends Document {
     equipmentCapacity?: number;
     equipmentRentalRate?: number;
   };
+  // DPWH Program of Works fields
+  address?: string;
+  targetStartDate?: Date;
+  targetCompletionDate?: Date;
+  contractDurationCD?: number;
+  workingDays?: number;
+  unworkableDays?: {
+    sundays?: number;
+    holidays?: number;
+    rainyDays?: number;
+  };
+  fundSource?: {
+    projectId?: string;
+    fundingAgreement?: string;
+    fundingOrganization?: string;
+  };
+  physicalTarget?: {
+    infraType?: string;
+    projectComponentId?: string;
+    targetAmount?: number;
+    unitOfMeasure?: string;
+  };
+  projectComponent?: {
+    componentId?: string;
+    infraId?: string;
+    chainage?: {
+      start?: string;
+      end?: string;
+    };
+    stationLimits?: {
+      start?: string;
+      end?: string;
+    };
+    coordinates?: {
+      latitude?: number;
+      longitude?: number;
+    };
+  };
+  allotedAmount?: number;
+  estimatedComponentCost?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -93,6 +133,49 @@ const ProjectSchema = new Schema<IProject>(
     haulingConfig: {
       type: Schema.Types.Mixed,
       default: null,
+    },
+    // DPWH Program of Works fields
+    address: {
+      type: String,
+      default: ''
+    },
+    targetStartDate: {
+      type: Date
+    },
+    targetCompletionDate: {
+      type: Date
+    },
+    contractDurationCD: {
+      type: Number,
+      default: 0
+    },
+    workingDays: {
+      type: Number,
+      default: 0
+    },
+    unworkableDays: {
+      type: Schema.Types.Mixed,
+      default: null
+    },
+    fundSource: {
+      type: Schema.Types.Mixed,
+      default: null
+    },
+    physicalTarget: {
+      type: Schema.Types.Mixed,
+      default: null
+    },
+    projectComponent: {
+      type: Schema.Types.Mixed,
+      default: null
+    },
+    allotedAmount: {
+      type: Number,
+      default: 0
+    },
+    estimatedComponentCost: {
+      type: Number,
+      default: 0
     }
   },
   {

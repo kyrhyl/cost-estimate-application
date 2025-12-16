@@ -14,6 +14,47 @@ interface Project {
   appropriation?: string;
   distanceFromOffice?: number;
   haulingCostPerKm?: number;
+  // DPWH Program of Works fields
+  implementingOffice?: string;
+  address?: string;
+  targetStartDate?: string;
+  targetCompletionDate?: string;
+  contractDurationCD?: number;
+  workingDays?: number;
+  unworkableDays?: {
+    sundays?: number;
+    holidays?: number;
+    rainyDays?: number;
+  };
+  fundSource?: {
+    projectId?: string;
+    fundingAgreement?: string;
+    fundingOrganization?: string;
+  };
+  physicalTarget?: {
+    infraType?: string;
+    projectComponentId?: string;
+    targetAmount?: number;
+    unitOfMeasure?: string;
+  };
+  projectComponent?: {
+    componentId?: string;
+    infraId?: string;
+    chainage?: {
+      start?: string;
+      end?: string;
+    };
+    stationLimits?: {
+      start?: string;
+      end?: string;
+    };
+    coordinates?: {
+      latitude?: number;
+      longitude?: number;
+    };
+  };
+  allotedAmount?: number;
+  estimatedComponentCost?: number;
 }
 
 interface DUPATemplate {
@@ -381,53 +422,9 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
 
   return (
     <div className="container mx-auto p-6">
-      {/* Project Header */}
-      <div className="mb-6 bg-white shadow rounded-lg p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">{project.projectName}</h1>
-            <div className="flex gap-4 text-sm text-gray-600">
-              <span><strong>Location:</strong> {project.projectLocation}</span>
-              {project.district && <span><strong>District:</strong> {project.district}</span>}
-              <span><strong>Status:</strong> {project.status}</span>
-            </div>
-            {project.appropriation && (
-              <div className="text-sm text-gray-600 mt-1">
-                <strong>Appropriation:</strong> {project.appropriation}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => router.push('/projects')}
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-          >
-            ← Back to Projects
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-          <div className="bg-blue-50 p-3 rounded">
-            <div className="text-sm text-gray-600">Total BOQ Items</div>
-            <div className="text-2xl font-bold">{boqItems.length}</div>
-          </div>
-          <div className="bg-green-50 p-3 rounded">
-            <div className="text-sm text-gray-600">Total Quantity</div>
-            <div className="text-2xl font-bold">
-              {boqItems.reduce((sum, item) => sum + item.quantity, 0).toFixed(2)}
-            </div>
-          </div>
-          <div className="bg-purple-50 p-3 rounded">
-            <div className="text-sm text-gray-600">Total Project Cost</div>
-            <div className="text-2xl font-bold">
-              ₱{totalProjectCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Tab Navigation */}
       <div className="mb-6">
-        <div className="border-b border-gray-200">
+        <div className="flex justify-between items-center border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setActiveTab('details')}
@@ -460,49 +457,197 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
               Hauling Distance
             </button>
           </nav>
+          <button
+            onClick={() => router.push('/projects')}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm"
+          >
+            ← Back to Projects
+          </button>
         </div>
       </div>
 
-      {/* Project Details Tab */}
+      {/* Project Details Tab - DPWH Program of Works Format */}
       {activeTab === 'details' && (
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-2xl font-semibold mb-4">Project Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
-              <div className="text-lg">{project.projectName}</div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-              <div className="text-lg">{project.projectLocation}</div>
-            </div>
-            {project.district && (
+          {/* DPWH Header */}
+          <div className="text-center mb-6 border-b-2 border-gray-800 pb-4">
+            <div className="text-sm font-semibold">Republic of the Philippines</div>
+            <div className="text-sm font-semibold">DEPARTMENT OF PUBLIC WORKS AND HIGHWAYS</div>
+            <div className="text-lg font-bold mt-2">PROGRAM OF WORKS/BUDGET COST</div>
+          </div>
+
+          {/* Project Information Grid */}
+          <div className="grid grid-cols-3 gap-6 mb-6 text-sm">
+            {/* Left Column */}
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
-                <div className="text-lg">{project.district}</div>
+                <div className="font-semibold">Implementing Office:</div>
+                <div className="border-b border-gray-300">{project.implementingOffice || 'DPWH Bukidnon 1st District Engineering Office'}</div>
               </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <div className="text-lg">{project.status}</div>
-            </div>
-            {project.appropriation && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Appropriation</label>
-                <div className="text-lg">{project.appropriation}</div>
+                <div className="font-semibold">Address:</div>
+                <div className="border-b border-gray-300">{project.address || 'San Victores St., Malaybalay City, Bukidnon'}</div>
               </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Distance from Office</label>
-              <div className="text-lg">{project.distanceFromOffice || 0} km</div>
+              <div>
+                <div className="font-semibold">Project Name:</div>
+                <div className="border-b border-gray-300">{project.projectName}</div>
+              </div>
+              <div>
+                <div className="font-semibold">Project Location:</div>
+                <div className="border-b border-gray-300">{project.projectLocation}</div>
+              </div>
+              <div>
+                <div className="font-semibold">Work Location:</div>
+                <div className="border-b border-gray-300">{project.district || 'Brgy. Violeta, Malaybalay City, Bukidnon'}</div>
+              </div>
+            </div>
+
+            {/* Middle Column */}
+            <div className="space-y-3">
+              <div>
+                <div className="font-semibold">Date Prepared:</div>
+                <div className="border-b border-gray-300">{project.targetStartDate ? new Date(project.targetStartDate).toLocaleDateString() : '_____________'}</div>
+              </div>
+              <div>
+                <div className="font-semibold">Target Start Date:</div>
+                <div className="border-b border-gray-300">{project.targetStartDate ? new Date(project.targetStartDate).toLocaleDateString() : 'January 15, 2026'}</div>
+              </div>
+              <div>
+                <div className="font-semibold">Target Completion Date:</div>
+                <div className="border-b border-gray-300">{project.targetCompletionDate ? new Date(project.targetCompletionDate).toLocaleDateString() : 'April 01, 2026'}</div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-3">
+              <div>
+                <div className="font-semibold">Contract Duration:</div>
+                <div className="border-b border-gray-300">{project.contractDurationCD || '___'} CD</div>
+              </div>
+              <div>
+                <div className="font-semibold">No. of Working Days:</div>
+                <div className="border-b border-gray-300">{project.workingDays || '___'} CD</div>
+              </div>
+              <div>
+                <div className="font-semibold">No. of Predetermined Unworkable Days:</div>
+                <div className="ml-4 space-y-1 text-xs">
+                  <div>a. Sundays: {project.unworkableDays?.sundays || '___'} CD</div>
+                  <div>b. Holidays: {project.unworkableDays?.holidays || '___'} CD</div>
+                  <div>c. Rainy Days: {project.unworkableDays?.rainyDays || '___'} CD</div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="mt-6">
+
+          {/* Fund Source */}
+          <div className="mb-6">
+            <div className="font-semibold text-sm mb-2">Fund Source:</div>
+            <table className="w-full border-collapse border border-gray-400 text-xs">
+              <thead className="bg-gray-200">
+                <tr>
+                  <th className="border border-gray-400 p-2">Project ID</th>
+                  <th className="border border-gray-400 p-2">Funding Agreement</th>
+                  <th className="border border-gray-400 p-2">Funding Organization</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-400 p-2">{project.fundSource?.projectId || ''}</td>
+                  <td className="border border-gray-400 p-2">{project.fundSource?.fundingAgreement || 'General Appropriation Act (GAA 2026)'}</td>
+                  <td className="border border-gray-400 p-2">{project.fundSource?.fundingOrganization || ''}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Physical Target */}
+          <div className="mb-6">
+            <div className="font-semibold text-sm mb-2">Physical Target:</div>
+            <table className="w-full border-collapse border border-gray-400 text-xs">
+              <thead className="bg-gray-200">
+                <tr>
+                  <th className="border border-gray-400 p-2">Infra Type</th>
+                  <th className="border border-gray-400 p-2">Project Component ID</th>
+                  <th className="border border-gray-400 p-2">Target Amount</th>
+                  <th className="border border-gray-400 p-2">Unit of Measure</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-400 p-2">{project.physicalTarget?.infraType || 'Local'}</td>
+                  <td className="border border-gray-400 p-2">{project.physicalTarget?.projectComponentId || 'CW1'}</td>
+                  <td className="border border-gray-400 p-2">{project.physicalTarget?.targetAmount || '1'}</td>
+                  <td className="border border-gray-400 p-2">{project.physicalTarget?.unitOfMeasure || 'No. of Storey'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Project Component Details */}
+          <div className="mb-6">
+            <div className="font-semibold text-sm mb-2">Project Component Details:</div>
+            <table className="w-full border-collapse border border-gray-400 text-xs">
+              <thead className="bg-gray-200">
+                <tr>
+                  <th className="border border-gray-400 p-2">Component ID</th>
+                  <th className="border border-gray-400 p-2">Infra ID</th>
+                  <th className="border border-gray-400 p-2">Chainage Start</th>
+                  <th className="border border-gray-400 p-2">Chainage End</th>
+                  <th className="border border-gray-400 p-2">Station Start</th>
+                  <th className="border border-gray-400 p-2">Station End</th>
+                  <th className="border border-gray-400 p-2">Latitude</th>
+                  <th className="border border-gray-400 p-2">Longitude</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.componentId || ''}</td>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.infraId || ''}</td>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.chainage?.start || 'X'}</td>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.chainage?.end || 'Y'}</td>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.stationLimits?.start || 'X'}</td>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.stationLimits?.end || 'Y'}</td>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.coordinates?.latitude || '8.13095'}</td>
+                  <td className="border border-gray-400 p-2">{project.projectComponent?.coordinates?.longitude || '125.12941'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Allotted Amount */}
+          <div className="mb-6">
+            <div className="font-semibold text-sm mb-2">Allotted Amount:</div>
+            <table className="w-full border-collapse border border-gray-400 text-xs">
+              <thead className="bg-gray-200">
+                <tr>
+                  <th className="border border-gray-400 p-2">Project Component ID</th>
+                  <th className="border border-gray-400 p-2">Estimated Project Component Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-400 p-2">{project.physicalTarget?.projectComponentId || ''}</td>
+                  <td className="border border-gray-400 p-2 text-right">
+                    ₱{(project.estimatedComponentCost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-6 flex gap-4">
             <button
               onClick={() => router.push(`/projects/${params.id}/edit`)}
               className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700"
             >
               Edit Project Details
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+            >
+              Print Program of Works
             </button>
           </div>
         </div>

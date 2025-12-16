@@ -10,12 +10,12 @@ const ProjectUpdateSchema = z.object({
   projectLocation: z.string().min(1).optional(),
   district: z.string().optional(),
   implementingOffice: z.string().optional(),
-  appropriation: z.number().min(0).optional(),
+  appropriation: z.union([z.string(), z.number()]).optional(),
   contractId: z.string().optional(),
   projectType: z.string().optional(),
   status: z.enum(['Planning', 'Approved', 'Ongoing', 'Completed', 'Cancelled']).optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   description: z.string().optional(),
   haulingCostPerKm: z.number().min(0).optional(),
   distanceFromOffice: z.number().min(0).optional(),
@@ -33,6 +33,46 @@ const ProjectUpdateSchema = z.object({
     equipmentCapacity: z.number().optional(),
     equipmentRentalRate: z.number().optional(),
   }).optional(),
+  // DPWH Program of Works fields
+  address: z.string().optional(),
+  targetStartDate: z.string().optional(),
+  targetCompletionDate: z.string().optional(),
+  contractDurationCD: z.number().optional(),
+  workingDays: z.number().optional(),
+  unworkableDays: z.object({
+    sundays: z.number().optional(),
+    holidays: z.number().optional(),
+    rainyDays: z.number().optional(),
+  }).optional(),
+  fundSource: z.object({
+    projectId: z.string().optional(),
+    fundingAgreement: z.string().optional(),
+    fundingOrganization: z.string().optional(),
+  }).optional(),
+  physicalTarget: z.object({
+    infraType: z.string().optional(),
+    projectComponentId: z.string().optional(),
+    targetAmount: z.number().optional(),
+    unitOfMeasure: z.string().optional(),
+  }).optional(),
+  projectComponent: z.object({
+    componentId: z.string().optional(),
+    infraId: z.string().optional(),
+    chainage: z.object({
+      start: z.string().optional(),
+      end: z.string().optional(),
+    }).optional(),
+    stationLimits: z.object({
+      start: z.string().optional(),
+      end: z.string().optional(),
+    }).optional(),
+    coordinates: z.object({
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+    }).optional(),
+  }).optional(),
+  allotedAmount: z.number().optional(),
+  estimatedComponentCost: z.number().optional(),
 });
 
 // GET /api/projects/:id - Get single project with estimates
