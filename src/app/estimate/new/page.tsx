@@ -21,11 +21,20 @@ interface RateItem {
   unitOfMeasurement: string;
 }
 
+interface DUPATemplate {
+  _id: string;
+  payItemNumber: string;
+  payItemDescription: string;
+  unitOfMeasurement: string;
+  category?: string;
+  status: 'Active' | 'Inactive';
+}
+
 export default function NewEstimatePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [inputMode, setInputMode] = useState<'manual' | 'json'>('manual');
+  const [inputMode, setInputMode] = useState<'manual' | 'json' | 'template'>('manual');
 
   // Project info
   const [contractId, setContractId] = useState('');
@@ -47,8 +56,14 @@ export default function NewEstimatePage() {
   const [rateItems, setRateItems] = useState<RateItem[]>([]);
   const [loadingRates, setLoadingRates] = useState(true);
 
+  // DUPA Templates
+  const [dupaTemplates, setDupaTemplates] = useState<DUPATemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [instantiating, setInstantiating] = useState(false);
+
   useEffect(() => {
     fetchRateItems();
+    fetchDUPATemplates();
   }, []);
 
   const fetchRateItems = async () => {
@@ -62,6 +77,74 @@ export default function NewEstimatePage() {
       console.error('Failed to fetch rate items:', err);
     } finally {
       setLoadingRates(false);
+    }
+  };
+
+  const fetchDUPATemplates = async () => {
+    try {
+      const response = await fetch('/api/dupa-templates?status=Active');
+      const data = await response.json();
+      if (data.success) {
+        setDupaTemplates(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch DUPA templates:', err);
+    }
+  };
+
+  const handleInstantiateTemplate = async () => {
+    if (!selectedTemplateId) {
+      setError('Please select a DUPA template');
+      return;
+    }
+
+    if (!contractLocation.trim()) {
+      setError('Please enter a location first (required for rate lookup)');
+      return;
+    }
+
+    setInstantiating(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/dupa-templates/${selectedTemplateId}/instantiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location: contractLocation })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const rateItem = data.data;
+        // Add instantiated rate item to BOQ
+        const newLine: BOQLineInput = {
+          itemNo: rateItem.payItemNumber,
+          description: rateItem.payItemDescription,
+          unit: rateItem.unitOfMeasurement,
+          quantity: 1.0,
+          payItemNumber: rateItem.payItemNumber,
+          part: '',
+          partDescription: '',
+          division: ''
+        };
+
+        // If we have empty lines, replace the first one, otherwise add new
+        if (boqLines.length === 1 && !boqLines[0].payItemNumber) {
+          setBOQLines([newLine]);
+        } else {
+          setBOQLines([...boqLines, newLine]);
+        }
+
+        setSelectedTemplateId('');
+        setError('');
+      } else {
+        setError(data.error || 'Failed to instantiate template');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to instantiate template');
+    } finally {
+      setInstantiating(false);
     }
   };
 
@@ -240,6 +323,13 @@ export default function NewEstimatePage() {
           </button>
           <button
             type="button"
+            onClick={() => setInputMode('template')}
+            className={inputMode === 'template' ? 'primary' : 'secondary'}
+          >
+            🎯 Use DUPA Template
+          </button>
+          <button
+            type="button"
             onClick={() => setInputMode('json')}
             className={inputMode === 'json' ? 'primary' : 'secondary'}
           >
@@ -247,6 +337,66 @@ export default function NewEstimatePage() {
           </button>
         </div>
       </div>
+
+      {/* DUPA Template Selector */}
+      {inputMode === 'template' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">📦 Instantiate from DUPA Template</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Select a DUPA template to automatically populate BOQ items with location-specific rates.
+            Make sure to enter the project location first.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-semibold mb-2">Project Location *</label>
+              <input
+                type="text"
+                value={contractLocation}
+                onChange={(e) => setContractLocation(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded"
+                placeholder="e.g., Malaybalay City, Bukidnon"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Location is required to fetch appropriate material prices and labor rates
+              </p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold mb-2">Select DUPA Template</label>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded"
+              >
+                <option value="">-- Select a template --</option>
+                {dupaTemplates.map((template) => (
+                  <option key={template._id} value={template._id}>
+                    {template.payItemNumber} - {template.payItemDescription}
+                    {template.category && ` (${template.category})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleInstantiateTemplate}
+            disabled={!selectedTemplateId || instantiating || !contractLocation}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {instantiating ? '⏳ Instantiating...' : '✨ Instantiate Template'}
+          </button>
+
+          {dupaTemplates.length === 0 && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+              ⚠️ No active DUPA templates found. Create templates first in the DUPA Templates section.
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit}>
         {inputMode === 'manual' ? (

@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Check for duplicates by material code
-      const codes = validation.data.map(m => m.materialCode);
+      const codes = validation.data!.map(m => m.materialCode);
       const existingMaterials = await Material.find({
         materialCode: { $in: codes }
       }).select('materialCode materialDescription');
@@ -178,23 +178,25 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      const materialData = validation.data!;
+      
       // Check if material code already exists
       const existing = await Material.findOne({ 
-        materialCode: validation.data.materialCode 
+        materialCode: materialData.materialCode 
       });
       
       if (existing) {
         return NextResponse.json(
           { 
             success: false, 
-            error: `Material ${validation.data.materialCode} already exists` 
+            error: `Material ${materialData.materialCode} already exists` 
           },
           { status: 409 }
         );
       }
       
       // Create new material
-      const material = await Material.create(validation.data);
+      const material = await Material.create(materialData);
       
       return NextResponse.json({
         success: true,

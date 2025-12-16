@@ -37,7 +37,7 @@ export default function Home() {
           <p className="text-gray-600 mb-4">
             Manage location-based labor rates per DOLE standards. Rates automatically apply based on project location.
           </p>
-          <a href="/labor-rates" className="inline-block bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+          <a href="/master/labor" className="inline-block bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
             View Labor Rates
           </a>
         </div>

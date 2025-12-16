@@ -111,8 +111,10 @@ export async function PATCH(
       );
     }
     
+    const updateData = validation.data!;
+    
     // Check if nothing to update
-    if (Object.keys(validation.data).length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { success: false, error: 'No fields to update' },
         { status: 400 }
@@ -120,9 +122,9 @@ export async function PATCH(
     }
     
     // If updating equipment number, check for duplicates
-    if (validation.data.no) {
+    if (updateData.no) {
       const existing = await Equipment.findOne({
-        no: validation.data.no,
+        no: updateData.no,
         _id: { $ne: params.id }
       });
       
@@ -130,7 +132,7 @@ export async function PATCH(
         return NextResponse.json(
           { 
             success: false, 
-            error: `Equipment #${validation.data.no} already exists` 
+            error: `Equipment #${updateData.no} already exists` 
           },
           { status: 409 }
         );
@@ -140,7 +142,7 @@ export async function PATCH(
     // Update equipment
     const equipment = await Equipment.findByIdAndUpdate(
       params.id,
-      { $set: validation.data },
+      { $set: updateData },
       { new: true, runValidators: true }
     ).lean();
     

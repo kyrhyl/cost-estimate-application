@@ -109,8 +109,10 @@ export async function PATCH(
       );
     }
     
+    const updateData = validation.data!;
+    
     // Check if nothing to update
-    if (Object.keys(validation.data).length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { success: false, error: 'No fields to update' },
         { status: 400 }
@@ -118,9 +120,9 @@ export async function PATCH(
     }
     
     // If updating material code, check for duplicates
-    if (validation.data.materialCode) {
+    if (updateData.materialCode) {
       const existing = await Material.findOne({
-        materialCode: validation.data.materialCode,
+        materialCode: updateData.materialCode,
         _id: { $ne: params.id }
       });
       
@@ -128,7 +130,7 @@ export async function PATCH(
         return NextResponse.json(
           { 
             success: false, 
-            error: `Material ${validation.data.materialCode} already exists` 
+            error: `Material ${updateData.materialCode} already exists` 
           },
           { status: 409 }
         );
@@ -138,7 +140,7 @@ export async function PATCH(
     // Update material
     const material = await Material.findByIdAndUpdate(
       params.id,
-      { $set: validation.data },
+      { $set: updateData },
       { new: true, runValidators: true }
     ).lean();
     

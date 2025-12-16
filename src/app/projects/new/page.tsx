@@ -46,7 +46,7 @@ export default function NewProjectPage() {
 
   const fetchLocations = async () => {
     try {
-      const response = await fetch('/api/labor-rates');
+      const response = await fetch('/api/master/labor');
       const result = await response.json();
       if (result.success) {
         setLocations(result.data);

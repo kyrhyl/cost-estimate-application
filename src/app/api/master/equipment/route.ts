@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Check for duplicates by equipment number
-      const numbers = validation.data.map(eq => eq.no);
+      const numbers = validation.data!.map(eq => eq.no);
       const existingEquipment = await Equipment.find({
         no: { $in: numbers }
       }).select('no description');
@@ -168,21 +168,23 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      const equipmentData = validation.data!;
+      
       // Check if equipment number already exists
-      const existing = await Equipment.findOne({ no: validation.data.no });
+      const existing = await Equipment.findOne({ no: equipmentData.no });
       
       if (existing) {
         return NextResponse.json(
           { 
             success: false, 
-            error: `Equipment #${validation.data.no} already exists` 
+            error: `Equipment #${equipmentData.no} already exists` 
           },
           { status: 409 }
         );
       }
       
       // Create new equipment
-      const equipment = await Equipment.create(validation.data);
+      const equipment = await Equipment.create(equipmentData);
       
       return NextResponse.json({
         success: true,

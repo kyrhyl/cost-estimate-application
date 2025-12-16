@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Insert all prices (allow duplicates for price history)
-      const prices = await MaterialPrice.insertMany(validation.data, { 
+      const prices = await MaterialPrice.insertMany(validation.data!, { 
         ordered: false 
       });
       
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Create new material price
-      const price = await MaterialPrice.create(validation.data);
+      const price = await MaterialPrice.create(validation.data!);
       
       return NextResponse.json({
         success: true,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { exportBOQToExcel } from '@/lib/export/excel';
 
 interface BOQLineInput {
   itemNo: string;
@@ -43,6 +44,7 @@ export default function EditEstimatePage() {
   // Rate Items for dropdown
   const [rateItems, setRateItems] = useState<RateItem[]>([]);
   const [loadingRates, setLoadingRates] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchRateItems();
@@ -147,6 +149,45 @@ export default function EditEstimatePage() {
         payItemNumber: payItemNumber
       };
       setBOQLines(updated);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      // Fetch full estimate data for export
+      const response = await fetch(`/api/estimates/${params.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        const estimate = data.data;
+        const exportData = {
+          projectName: estimate.projectName,
+          projectLocation: estimate.projectLocation,
+          implementingOffice: estimate.implementingOffice || 'DPWH',
+          contractId: estimate.contractId || '',
+          date: new Date().toISOString().split('T')[0],
+          items: estimate.boqLines.map((line: any) => ({
+            payItemNumber: line.payItemNumber || line.itemNo,
+            payItemDescription: line.description,
+            unitOfMeasurement: line.unit,
+            quantity: line.quantity,
+            unitCost: line.unitRate || 0,
+            totalAmount: line.totalAmount || 0,
+            category: line.part || '',
+          })),
+          totalDirectCost: estimate.totalDirectCostSubmitted || 0,
+          grandTotal: estimate.grandTotalSubmitted || 0,
+        };
+
+        exportBOQToExcel(exportData, `BOQ-${estimate.contractId || 'estimate'}-${params.id}.xlsx`);
+      } else {
+        setError('Failed to fetch estimate data for export');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to export');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -417,6 +458,42 @@ export default function EditEstimatePage() {
           </div>
         </div>
 
+        {/* Calculation Preview Panel */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 mb-6">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">📊 BOQ Summary</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Total Items</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {boqLines.filter(line => line.payItemNumber && line.description && line.quantity > 0).length}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Total Quantity</div>
+              <div className="text-2xl font-bold text-green-600">
+                {boqLines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0).toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Unique Units</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {new Set(boqLines.filter(l => l.unit).map(l => l.unit)).size}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Parts/Divisions</div>
+              <div className="text-2xl font-bold text-orange-600">
+                {new Set(boqLines.filter(l => l.part).map(l => l.part)).size}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-gray-700">
+            <strong>ℹ️ Note:</strong> Cost calculations will be performed after applying labor, material, and equipment rates. 
+            Use the <a href={`/estimate/${params.id}`} className="text-blue-600 hover:underline">View Estimate</a> page 
+            or <a href={`/estimate/${params.id}/reports`} className="text-blue-600 hover:underline">Reports</a> page to see final costs.
+          </div>
+        </div>
+
         {/* Submit Button */}
         <div className="flex gap-4">
           <button
@@ -425,6 +502,14 @@ export default function EditEstimatePage() {
             className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving...' : 'Save Changes'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={exporting}
+            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {exporting ? '⏳ Exporting...' : '📊 Export to Excel'}
           </button>
           <a
             href={`/estimate/${params.id}`}

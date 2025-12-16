@@ -7,7 +7,7 @@
  */
 
 import mongoose from 'mongoose';
-import dbConnect from '../src/lib/mongodb';
+import dbConnect from '../src/lib/db/connect';
 
 // Import models
 import LaborRate from '../src/models/LaborRate';

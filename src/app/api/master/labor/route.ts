@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Check for duplicates by location
-      const locations = validation.data.map(rate => rate.location);
+      const locations = validation.data!.map(rate => rate.location);
       const existingRates = await LaborRate.find({
         location: { $in: locations }
       }).select('location');
@@ -163,23 +163,25 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      const laborRateData = validation.data!;
+      
       // Check if location already exists
       const existing = await LaborRate.findOne({ 
-        location: validation.data.location 
+        location: laborRateData.location 
       });
       
       if (existing) {
         return NextResponse.json(
           { 
             success: false, 
-            error: `Labor rate already exists for location: ${validation.data.location}` 
+            error: `Labor rate already exists for location: ${laborRateData.location}` 
           },
           { status: 409 }
         );
       }
       
       // Create new labor rate
-      const laborRate = await LaborRate.create(validation.data);
+      const laborRate = await LaborRate.create(laborRateData);
       
       return NextResponse.json({
         success: true,

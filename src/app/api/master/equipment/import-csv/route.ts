@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const { csvData, clearExisting, skipDuplicates } = validation.data;
+    const { csvData, clearExisting, skipDuplicates } = validation.data!;
     
     // Parse CSV
     const parseResult = parseEquipmentCsv(csvData);

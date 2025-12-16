@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const validatedData = validation.data;
+    const validatedData = validation.data!;
     
     const useEvaluated = body.useEvaluated || false;
     

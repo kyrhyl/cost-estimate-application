@@ -15,6 +15,9 @@ export const BoqLineSchema = z.object({
   unit: z.string().min(1, 'Unit is required'),
   quantity: z.number().positive('Quantity must be positive'),
   payItemNumber: z.string().optional(),
+  part: z.string().optional(),
+  partDescription: z.string().optional(),
+  division: z.string().optional(),
 })
 
 export const ImportBoqSchema = z.object({

@@ -112,8 +112,10 @@ export async function PATCH(
       );
     }
     
+    const updateData = validation.data!;
+    
     // Check if nothing to update
-    if (Object.keys(validation.data).length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { success: false, error: 'No fields to update' },
         { status: 400 }
@@ -123,7 +125,7 @@ export async function PATCH(
     // Update material price
     const price = await MaterialPrice.findByIdAndUpdate(
       params.id,
-      { $set: validation.data },
+      { $set: updateData },
       { new: true, runValidators: true }
     ).lean();
     

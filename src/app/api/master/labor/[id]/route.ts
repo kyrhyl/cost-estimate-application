@@ -115,8 +115,10 @@ export async function PATCH(
       );
     }
     
+    const updateData = validation.data!;
+    
     // Check if nothing to update
-    if (Object.keys(validation.data).length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { success: false, error: 'No fields to update' },
         { status: 400 }
@@ -124,9 +126,9 @@ export async function PATCH(
     }
     
     // If updating location, check for duplicates
-    if (validation.data.location) {
+    if (updateData.location) {
       const existing = await LaborRate.findOne({
-        location: validation.data.location,
+        location: updateData.location,
         _id: { $ne: params.id }
       });
       
@@ -134,7 +136,7 @@ export async function PATCH(
         return NextResponse.json(
           { 
             success: false, 
-            error: `Labor rate already exists for location: ${validation.data.location}` 
+            error: `Labor rate already exists for location: ${updateData.location}` 
           },
           { status: 409 }
         );
@@ -144,7 +146,7 @@ export async function PATCH(
     // Update labor rate
     const laborRate = await LaborRate.findByIdAndUpdate(
       params.id,
-      { $set: validation.data },
+      { $set: updateData },
       { new: true, runValidators: true }
     ).lean();
     

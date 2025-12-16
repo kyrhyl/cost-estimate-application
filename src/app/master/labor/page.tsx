@@ -25,7 +25,7 @@ export default function LaborRatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [districtFilter, setDistrictFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingRate, setEditingRate] = useState<LaborRate | null>(null);
   const [formData, setFormData] = useState({
@@ -44,14 +44,14 @@ export default function LaborRatesPage() {
 
   useEffect(() => {
     fetchLaborRates();
-  }, [searchTerm, districtFilter]);
+  }, [searchTerm, locationFilter]);
 
   const fetchLaborRates = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (searchTerm) params.append('location', searchTerm);
-      if (districtFilter) params.append('district', districtFilter);
+      if (searchTerm) params.append('search', searchTerm);
+      if (locationFilter) params.append('location', locationFilter);
       
       const response = await fetch(`/api/master/labor?${params}`);
       const result = await response.json();
@@ -154,7 +154,7 @@ export default function LaborRatesPage() {
     });
   };
 
-  const districts = [...new Set(laborRates.map(r => r.district))];
+  const locations = [...new Set(laborRates.map(r => r.location))].sort();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -168,29 +168,29 @@ export default function LaborRatesPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search Location
+              Search
             </label>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by location..."
+              placeholder="Search by location or district..."
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by District
+              Filter by Location
             </label>
             <select
-              value={districtFilter}
-              onChange={(e) => setDistrictFilter(e.target.value)}
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="">All Districts</option>
-              {districts.map(district => (
-                <option key={district} value={district}>{district}</option>
+              <option value="">All Locations</option>
+              {locations.map(location => (
+                <option key={location} value={location}>{location}</option>
               ))}
             </select>
           </div>

@@ -83,7 +83,7 @@ export async function POST(
 
     // Instantiate labor entries
     const laborEntries = await Promise.all(
-      template.laborTemplate.map(async (labor) => {
+      template.laborTemplate.map(async (labor: any) => {
         const rateField = labor.designation.toLowerCase().replace(/\s+/g, '');
         const hourlyRate = (laborRates as any)[rateField] || 0;
         
@@ -99,13 +99,13 @@ export async function POST(
 
     // Instantiate equipment entries
     const equipmentEntries = await Promise.all(
-      template.equipmentTemplate.map(async (equip) => {
+      template.equipmentTemplate.map(async (equip: any) => {
         let hourlyRateOperating = 0;
         let hourlyRateIdle = 0;
         let description = equip.description;
 
         if (equip.equipmentId) {
-          const equipment = await Equipment.findById(equip.equipmentId).lean();
+          const equipment: any = await Equipment.findById(equip.equipmentId).lean();
           if (equipment) {
             hourlyRateOperating = equipment.hourlyRateOperating;
             hourlyRateIdle = equipment.hourlyRateIdle;
@@ -139,7 +139,7 @@ export async function POST(
 
     // Instantiate material entries
     const materialEntries = await Promise.all(
-      template.materialTemplate.map(async (material) => {
+      template.materialTemplate.map(async (material: any) => {
         let unitCost = 0;
 
         if (material.materialCode) {
@@ -153,7 +153,7 @@ export async function POST(
             priceQuery.effectiveDate = { $lte: new Date(effectiveDate) };
           }
 
-          const price = await MaterialPrice.findOne(priceQuery)
+          const price: any = await MaterialPrice.findOne(priceQuery)
             .sort({ effectiveDate: -1 })
             .lean();
           

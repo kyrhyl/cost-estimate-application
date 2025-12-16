@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { exportBOQToExcel, exportProjectSummaryToExcel } from '@/lib/export/excel';
 
 interface BOQLine {
   itemNo: string;
@@ -49,6 +50,7 @@ export default function EstimateReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reportType, setReportType] = useState<'breakdown' | 'budget' | 'summary'>('breakdown');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchEstimate();
@@ -96,6 +98,69 @@ export default function EstimateReportsPage() {
     return grouped;
   };
 
+  const handleExportBOQ = () => {
+    if (!estimate) return;
+    
+    setExporting(true);
+    try {
+      const exportData = {
+        projectName: estimate.projectName,
+        projectLocation: estimate.projectLocation,
+        implementingOffice: estimate.implementingOffice || 'DPWH',
+        contractId: '',
+        date: new Date(estimate.createdAt).toISOString().split('T')[0],
+        items: estimate.boqLines.map((line) => ({
+          payItemNumber: line.payItemNumber || line.itemNo,
+          payItemDescription: line.description,
+          unitOfMeasurement: line.unit,
+          quantity: line.quantity,
+          unitCost: line.unitRate || 0,
+          totalAmount: line.totalAmount || 0,
+          category: line.part || '',
+        })),
+        totalDirectCost: estimate.totalDirectCostSubmitted || 0,
+        grandTotal: estimate.grandTotalSubmitted || 0,
+      };
+
+      exportBOQToExcel(exportData, `BOQ-${estimate._id}.xlsx`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to export');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportSummary = () => {
+    if (!estimate) return;
+    
+    setExporting(true);
+    try {
+      const items = estimate.boqLines.map((line) => ({
+        payItemNumber: line.payItemNumber || line.itemNo,
+        payItemDescription: line.description,
+        unitOfMeasurement: line.unit,
+        quantity: line.quantity,
+        unitCost: line.unitRate || 0,
+        totalAmount: line.totalAmount || 0,
+        category: line.part || '',
+      }));
+
+      const exportData = {
+        projectName: estimate.projectName,
+        projectLocation: estimate.projectLocation,
+        contractId: '',
+        date: new Date(estimate.createdAt).toISOString().split('T')[0],
+        items,
+      };
+
+      exportProjectSummaryToExcel(exportData, items, `Summary-${estimate._id}.xlsx`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to export');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-8">Loading reports...</div>;
   }
@@ -112,6 +177,30 @@ export default function EstimateReportsPage() {
 
   return (
     <div className="py-8 max-w-7xl mx-auto">
+      {/* Export Actions */}
+      <div className="mb-6 flex gap-2">
+        <button
+          onClick={handleExportBOQ}
+          disabled={exporting}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+        >
+          {exporting ? 'Exporting...' : '📥 Export BOQ to Excel'}
+        </button>
+        <button
+          onClick={handleExportSummary}
+          disabled={exporting}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {exporting ? 'Exporting...' : '📊 Export Summary to Excel'}
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+        >
+          🖨️ Print Report
+        </button>
+      </div>
+
       {/* Report Type Selector */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex gap-2">
