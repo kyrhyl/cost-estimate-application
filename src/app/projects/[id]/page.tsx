@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { calculateIndirectCosts, getEDCBracketDescription } from '@/lib/calc/indirect-costs';
 
 type TabView = 'details' | 'dupa' | 'hauling';
 
@@ -11,6 +12,7 @@ interface Project {
   projectLocation: string;
   district?: string;
   status: string;
+  description?: string;
   appropriation?: string;
   distanceFromOffice?: number;
   haulingCostPerKm?: number;
@@ -170,7 +172,11 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     
     setAdding(true);
     try {
-      // Step 1: Instantiate template with project location and hauling cost
+      // Calculate project-level OCM and CP percentages based on current total EDC
+      const currentTotalEDC = boqItems.reduce((sum, item) => sum + item.totalAmount, 0);
+      const projectPercentages = calculateIndirectCosts(currentTotalEDC);
+      
+      // Step 1: Instantiate template with project location, hauling cost, and project-level percentages
       const instantiateResponse = await fetch(
         `/api/dupa-templates/${selectedTemplate}/instantiate`,
         {
@@ -180,6 +186,8 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
             location: project.projectLocation,
             quantity,
             projectId: params.id, // Pass project ID for hauling cost calculation
+            projectOcmPercentage: projectPercentages.ocmPercentage, // Use project-level OCM %
+            projectCpPercentage: projectPercentages.contractorsProfitPercentage, // Use project-level CP %
           }),
         }
       );
@@ -333,15 +341,20 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     let failCount = 0;
 
     try {
+      // Calculate project-level OCM and CP percentages based on total EDC
+      const projectPercentages = calculateIndirectCosts(totalDirectCost);
+      
       for (const item of boqItems) {
         try {
-          // Re-instantiate the template with current rates
+          // Re-instantiate the template with current rates and project-level percentages
           const instantiateResponse = await fetch(`/api/dupa-templates/${(item as any).templateId._id || (item as any).templateId}/instantiate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               location: project?.projectLocation || 'Cabangasan',
               projectId: params.id,
+              projectOcmPercentage: projectPercentages.ocmPercentage, // Use project-level OCM %
+              projectCpPercentage: projectPercentages.contractorsProfitPercentage, // Use project-level CP %
             }),
           });
 
@@ -410,7 +423,8 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     }
   };
 
-  const totalProjectCost = boqItems.reduce((sum, item) => sum + item.totalAmount, 0);
+  const totalDirectCost = boqItems.reduce((sum, item) => sum + item.totalAmount, 0);
+  const indirectCosts = calculateIndirectCosts(totalDirectCost);
 
   if (loading || !project) {
     return (
@@ -468,184 +482,204 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
 
       {/* Project Details Tab - DPWH Program of Works Format */}
       {activeTab === 'details' && (
-        <div className="bg-white shadow rounded-lg p-6">
-          {/* DPWH Header */}
-          <div className="text-center mb-6 border-b-2 border-gray-800 pb-4">
-            <div className="text-sm font-semibold">Republic of the Philippines</div>
-            <div className="text-sm font-semibold">DEPARTMENT OF PUBLIC WORKS AND HIGHWAYS</div>
-            <div className="text-lg font-bold mt-2">PROGRAM OF WORKS/BUDGET COST</div>
-          </div>
-
-          {/* Project Information Grid */}
-          <div className="grid grid-cols-3 gap-6 mb-6 text-sm">
-            {/* Left Column */}
-            <div className="space-y-3">
-              <div>
-                <div className="font-semibold">Implementing Office:</div>
-                <div className="border-b border-gray-300">{project.implementingOffice || 'DPWH Bukidnon 1st District Engineering Office'}</div>
+        <div className="bg-white shadow rounded-lg p-3">
+          {/* 3×3 Grid Structure */}
+          <div className="grid grid-cols-[2fr_1fr_1fr] gap-2 mb-2 text-xs">
+            
+            {/* ROW 1, COL 1: General Project Details */}
+            <div className="border border-black p-2 space-y-1 row-span-1">
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <span className="font-semibold">Implementing Office:</span>
+                <span className="border-b border-black px-1">{project.implementingOffice || 'DPWH Bukidnon 1st District Engineering Office'}</span>
               </div>
-              <div>
-                <div className="font-semibold">Address:</div>
-                <div className="border-b border-gray-300">{project.address || 'San Victores St., Malaybalay City, Bukidnon'}</div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <span className="font-semibold">Address:</span>
+                <span className="border-b border-black px-1">{project.address || 'San Victores St., Malaybalay City, Bukidnon'}</span>
               </div>
-              <div>
-                <div className="font-semibold">Project Name:</div>
-                <div className="border-b border-gray-300">{project.projectName}</div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <span className="font-semibold">Project Name:</span>
+                <div className="space-y-0.5">
+                  <div className="border-b border-black px-1">{project.projectName}</div>
+                  <div className="border-b border-black px-1">{project.projectLocation}</div>
+                </div>
               </div>
-              <div>
-                <div className="font-semibold">Project Location:</div>
-                <div className="border-b border-gray-300">{project.projectLocation}</div>
-              </div>
-              <div>
-                <div className="font-semibold">Work Location:</div>
-                <div className="border-b border-gray-300">{project.district || 'Brgy. Violeta, Malaybalay City, Bukidnon'}</div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <span className="font-semibold">Project Location:</span>
+                <span className="border-b border-black px-1">{project.projectLocation}</span>
               </div>
             </div>
 
-            {/* Middle Column */}
-            <div className="space-y-3">
-              <div>
-                <div className="font-semibold">Date Prepared:</div>
-                <div className="border-b border-gray-300">{project.targetStartDate ? new Date(project.targetStartDate).toLocaleDateString() : '_____________'}</div>
+            {/* ROW 1, COL 2: Date Details */}
+            <div className="border border-black p-2 space-y-1">
+              <div className="grid grid-cols-[auto_1fr] gap-1">
+                <span className="font-semibold whitespace-nowrap text-[11px]">Date Prepared:</span>
+                <span className="border-b border-black px-1 text-right text-[11px]">{new Date().toLocaleDateString()}</span>
               </div>
-              <div>
-                <div className="font-semibold">Target Start Date:</div>
-                <div className="border-b border-gray-300">{project.targetStartDate ? new Date(project.targetStartDate).toLocaleDateString() : 'January 15, 2026'}</div>
+              <div className="grid grid-cols-[auto_1fr] gap-1">
+                <span className="font-semibold whitespace-nowrap text-[11px]">Target Start Date:</span>
+                <span className="border-b border-black px-1 text-right text-[11px]">{project.targetStartDate ? new Date(project.targetStartDate).toLocaleDateString() : 'January 15, 2026'}</span>
               </div>
-              <div>
-                <div className="font-semibold">Target Completion Date:</div>
-                <div className="border-b border-gray-300">{project.targetCompletionDate ? new Date(project.targetCompletionDate).toLocaleDateString() : 'April 01, 2026'}</div>
+              <div className="grid grid-cols-[auto_1fr] gap-1">
+                <span className="font-semibold whitespace-nowrap text-[11px]">Target Completion Date:</span>
+                <span className="border-b border-black px-1 text-right text-[11px]">{project.targetCompletionDate ? new Date(project.targetCompletionDate).toLocaleDateString() : 'April 01, 2026'}</span>
               </div>
             </div>
 
-            {/* Right Column */}
-            <div className="space-y-3">
-              <div>
-                <div className="font-semibold">Contract Duration:</div>
-                <div className="border-b border-gray-300">{project.contractDurationCD || '___'} CD</div>
+            {/* ROW 1, COL 3: Contract Duration */}
+            <div className="border border-black p-2 space-y-1">
+              <div className="grid grid-cols-[auto_1fr] gap-1">
+                <span className="font-semibold whitespace-nowrap text-[11px]">Contract Duration:</span>
+                <span className="border-b border-black px-1 text-right text-[11px]">{project.contractDurationCD || '200.00'} CD</span>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-1">
+                <span className="font-semibold whitespace-nowrap text-[11px]">No. of Workable Days:</span>
+                <span className="border-b border-black px-1 text-right text-[11px]">{project.workingDays || '127'} CD</span>
               </div>
               <div>
-                <div className="font-semibold">No. of Working Days:</div>
-                <div className="border-b border-gray-300">{project.workingDays || '___'} CD</div>
-              </div>
-              <div>
-                <div className="font-semibold">No. of Predetermined Unworkable Days:</div>
-                <div className="ml-4 space-y-1 text-xs">
-                  <div>a. Sundays: {project.unworkableDays?.sundays || '___'} CD</div>
-                  <div>b. Holidays: {project.unworkableDays?.holidays || '___'} CD</div>
-                  <div>c. Rainy Days: {project.unworkableDays?.rainyDays || '___'} CD</div>
+                <div className="font-semibold mb-0.5 text-[10px]">No. of Predetermined Unworkable Days:</div>
+                <div className="ml-3 space-y-0.5 text-[10px]">
+                  <div className="grid grid-cols-[1fr_auto] gap-1">
+                    <span>a. Sundays:</span>
+                    <span className="border-b border-black w-16 text-right px-1">{project.unworkableDays?.sundays || '27'} CD</span>
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto] gap-1">
+                    <span>b. Holidays:</span>
+                    <span className="border-b border-black w-16 text-right px-1">{project.unworkableDays?.holidays || '8'} CD</span>
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto] gap-1">
+                    <span>c. Rainy Days:</span>
+                    <span className="border-b border-black w-16 text-right px-1">{project.unworkableDays?.rainyDays || '36'} CD</span>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* ROW 2, COL 1: Work Location */}
+            <div className="border border-black p-2">
+              <div className="grid grid-cols-[auto_1fr] gap-2">
+                <span className="font-semibold whitespace-nowrap">Work Location:</span>
+                <span className="border-b border-black px-1">{project.district || ''}</span>
+              </div>
+              <table className="w-full border-collapse border border-black text-[10px] mt-2">
+                <thead>
+                  <tr className="bg-slate-700 text-white">
+                    <th className="border border-black px-1 py-1 text-center font-semibold" rowSpan={2}>Project Component ID</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold" rowSpan={2}>Infra ID</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold" colSpan={2}>Chainage</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold" colSpan={2}>Station Limits</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold" colSpan={2}>Coordinates</th>
+                  </tr>
+                  <tr className="bg-slate-700 text-white">
+                    <th className="border border-black px-1 py-1 text-center font-semibold">Start<br/>X</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold">End<br/>Y</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold">Start<br/>X</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold">End<br/>Y</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold">Latitude</th>
+                    <th className="border border-black px-1 py-1 text-center font-semibold">Longitude</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  <tr>
+                    <td className="border border-black px-1 py-2">{project.projectComponent?.componentId || ''}</td>
+                    <td className="border border-black px-1 py-2">{project.projectComponent?.infraId || ''}</td>
+                    <td className="border border-black px-1 py-2 text-center">{project.projectComponent?.chainage?.start || 'X'}</td>
+                    <td className="border border-black px-1 py-2 text-center">{project.projectComponent?.chainage?.end || 'Y'}</td>
+                    <td className="border border-black px-1 py-2 text-center">{project.projectComponent?.stationLimits?.start || 'X'}</td>
+                    <td className="border border-black px-1 py-2 text-center">{project.projectComponent?.stationLimits?.end || 'Y'}</td>
+                    <td className="border border-black px-1 py-2 text-center">{project.projectComponent?.coordinates?.latitude || ''}</td>
+                    <td className="border border-black px-1 py-2 text-center">{project.projectComponent?.coordinates?.longitude || ''}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* ROW 2, COL 2-3: Funding Source (spans 2 columns) */}
+            <div className="border border-black p-2 col-span-2">
+              <div className="font-semibold mb-1">Fund Source:</div>
+              <table className="w-full border-collapse border border-black text-[10px]">
+                <thead>
+                  <tr className="bg-slate-700 text-white">
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Project ID</th>
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Funding Agreement</th>
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Funding Organization</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  <tr>
+                    <td className="border border-black px-2 py-2">{project.fundSource?.projectId || ''}</td>
+                    <td className="border border-black px-2 py-2">{project.fundSource?.fundingAgreement || 'FY 2025 BEFF - BATCH 1'}</td>
+                    <td className="border border-black px-2 py-2">{project.fundSource?.fundingOrganization || ''}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* ROW 3, COL 1: Allotted Amount */}
+            <div className="border border-black p-2">
+              <div className="font-semibold mb-1">Allotted Amount:</div>
+              <table className="w-full border-collapse border border-black text-[10px]">
+                <thead>
+                  <tr className="bg-slate-700 text-white">
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Project Component ID</th>
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Estimated Project Component Cost</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  <tr>
+                    <td className="border border-black px-2 py-2">{project.physicalTarget?.projectComponentId || 'CW1'}</td>
+                    <td className="border border-black px-2 py-2 text-right font-medium">
+                      {(project.estimatedComponentCost || 20100000).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* ROW 3, COL 2-3: Physical Target (spans 2 columns) */}
+            <div className="border border-black p-2 col-span-2">
+              <div className="font-semibold mb-1">Physical Target:</div>
+              <table className="w-full border-collapse border border-black text-[10px]">
+                <thead>
+                  <tr className="bg-slate-700 text-white">
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Infra Type</th>
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Project Component ID</th>
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Target Amount</th>
+                    <th className="border border-black px-2 py-1 text-center font-semibold">Unit of Measure</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  <tr>
+                    <td className="border border-black px-2 py-2">{project.physicalTarget?.infraType || 'Local'}</td>
+                    <td className="border border-black px-2 py-2">{project.physicalTarget?.projectComponentId || 'CW1'}</td>
+                    <td className="border border-black px-2 py-2 text-center">{project.physicalTarget?.targetAmount || '1'}</td>
+                    <td className="border border-black px-2 py-2">{project.physicalTarget?.unitOfMeasure || 'No. of Storey'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Fund Source */}
-          <div className="mb-6">
-            <div className="font-semibold text-sm mb-2">Fund Source:</div>
-            <table className="w-full border-collapse border border-gray-400 text-xs">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="border border-gray-400 p-2">Project ID</th>
-                  <th className="border border-gray-400 p-2">Funding Agreement</th>
-                  <th className="border border-gray-400 p-2">Funding Organization</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border border-gray-400 p-2">{project.fundSource?.projectId || ''}</td>
-                  <td className="border border-gray-400 p-2">{project.fundSource?.fundingAgreement || 'General Appropriation Act (GAA 2026)'}</td>
-                  <td className="border border-gray-400 p-2">{project.fundSource?.fundingOrganization || ''}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Physical Target */}
-          <div className="mb-6">
-            <div className="font-semibold text-sm mb-2">Physical Target:</div>
-            <table className="w-full border-collapse border border-gray-400 text-xs">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="border border-gray-400 p-2">Infra Type</th>
-                  <th className="border border-gray-400 p-2">Project Component ID</th>
-                  <th className="border border-gray-400 p-2">Target Amount</th>
-                  <th className="border border-gray-400 p-2">Unit of Measure</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border border-gray-400 p-2">{project.physicalTarget?.infraType || 'Local'}</td>
-                  <td className="border border-gray-400 p-2">{project.physicalTarget?.projectComponentId || 'CW1'}</td>
-                  <td className="border border-gray-400 p-2">{project.physicalTarget?.targetAmount || '1'}</td>
-                  <td className="border border-gray-400 p-2">{project.physicalTarget?.unitOfMeasure || 'No. of Storey'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Project Component Details */}
-          <div className="mb-6">
-            <div className="font-semibold text-sm mb-2">Project Component Details:</div>
-            <table className="w-full border-collapse border border-gray-400 text-xs">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="border border-gray-400 p-2">Component ID</th>
-                  <th className="border border-gray-400 p-2">Infra ID</th>
-                  <th className="border border-gray-400 p-2">Chainage Start</th>
-                  <th className="border border-gray-400 p-2">Chainage End</th>
-                  <th className="border border-gray-400 p-2">Station Start</th>
-                  <th className="border border-gray-400 p-2">Station End</th>
-                  <th className="border border-gray-400 p-2">Latitude</th>
-                  <th className="border border-gray-400 p-2">Longitude</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.componentId || ''}</td>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.infraId || ''}</td>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.chainage?.start || 'X'}</td>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.chainage?.end || 'Y'}</td>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.stationLimits?.start || 'X'}</td>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.stationLimits?.end || 'Y'}</td>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.coordinates?.latitude || '8.13095'}</td>
-                  <td className="border border-gray-400 p-2">{project.projectComponent?.coordinates?.longitude || '125.12941'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Allotted Amount */}
-          <div className="mb-6">
-            <div className="font-semibold text-sm mb-2">Allotted Amount:</div>
-            <table className="w-full border-collapse border border-gray-400 text-xs">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="border border-gray-400 p-2">Project Component ID</th>
-                  <th className="border border-gray-400 p-2">Estimated Project Component Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border border-gray-400 p-2">{project.physicalTarget?.projectComponentId || ''}</td>
-                  <td className="border border-gray-400 p-2 text-right">
-                    ₱{(project.estimatedComponentCost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {/* Description Section */}
+          {project.description && (
+            <div className="mt-4 mb-3">
+              <div className="font-semibold text-[10px] mb-1">PROJECT DESCRIPTION:</div>
+              <div className="border border-gray-400 px-2 py-1 text-[10px] leading-relaxed">
+                {project.description}
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
-          <div className="mt-6 flex gap-4">
+          <div className="mt-4 flex gap-2">
             <button
               onClick={() => router.push(`/projects/${params.id}/edit`)}
-              className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700"
+              className="bg-indigo-600 text-white px-4 py-1.5 text-xs rounded hover:bg-indigo-700"
             >
               Edit Project Details
             </button>
             <button
               onClick={() => window.print()}
-              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+              className="bg-green-600 text-white px-4 py-1.5 text-xs rounded hover:bg-green-700"
             >
               Print Program of Works
             </button>
@@ -766,6 +800,69 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
               </tbody>
             </table>
           </div>
+
+          {/* Cost Summary with Indirect Costs */}
+          {boqItems.length > 0 && (
+            <div className="mt-6 bg-white shadow rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">Project Cost Summary</h3>
+              <div className="text-sm mb-2 text-gray-600">
+                EDC Bracket: <span className="font-semibold">{getEDCBracketDescription(totalDirectCost)}</span>
+              </div>
+              <table className="w-full border-collapse border border-gray-300">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border border-gray-300 px-4 py-2 text-left">Description</th>
+                    <th className="border border-gray-300 px-4 py-2 text-center w-32">Percentage</th>
+                    <th className="border border-gray-300 px-4 py-2 text-right w-48">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-2">Estimated Direct Cost (EDC)</td>
+                    <td className="border border-gray-300 px-4 py-2 text-center">—</td>
+                    <td className="border border-gray-300 px-4 py-2 text-right font-semibold text-blue-600">
+                      ₱{indirectCosts.estimatedDirectCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                  <tr className="bg-blue-50">
+                    <td className="border border-gray-300 px-4 py-2">OCM (Overhead, Contingencies, Miscellaneous)</td>
+                    <td className="border border-gray-300 px-4 py-2 text-center font-medium">{indirectCosts.ocmPercentage}%</td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      ₱{indirectCosts.ocmAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                  <tr className="bg-green-50">
+                    <td className="border border-gray-300 px-4 py-2">Contractor's Profit (CP)</td>
+                    <td className="border border-gray-300 px-4 py-2 text-center font-medium">{indirectCosts.contractorsProfitPercentage}%</td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      ₱{indirectCosts.contractorsProfitAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                  <tr className="bg-yellow-50 font-semibold">
+                    <td className="border border-gray-300 px-4 py-2">Total Indirect Cost</td>
+                    <td className="border border-gray-300 px-4 py-2 text-center">{indirectCosts.totalIndirectCostPercentage}%</td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      ₱{indirectCosts.totalIndirectCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                  <tr className="bg-purple-100 font-bold text-lg">
+                    <td className="border border-gray-300 px-4 py-3">TOTAL PROJECT COST</td>
+                    <td className="border border-gray-300 px-4 py-3 text-center">—</td>
+                    <td className="border border-gray-300 px-4 py-3 text-right text-purple-700">
+                      ₱{indirectCosts.totalProjectCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="text-xs text-gray-500 mt-3">
+                <strong>Note:</strong> Indirect cost percentages are based on DPWH Standard Guidelines:<br/>
+                • Up to ₱5M: OCM 15%, CP 10%<br/>
+                • ₱5M-₱50M: OCM 12%, CP 8%<br/>
+                • ₱50M-₱150M: OCM 10%, CP 8%<br/>
+                • Above ₱150M: OCM 8%, CP 8%
+              </div>
+            </div>
+          )}
         </div>
       )}
 

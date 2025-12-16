@@ -25,6 +25,8 @@ const InstantiateRequestSchema = z.object({
   useEvaluated: z.boolean().default(false),
   effectiveDate: z.string().optional(), // For fetching historical prices
   projectId: z.string().optional(),
+  projectOcmPercentage: z.number().optional(), // Override with project-level OCM %
+  projectCpPercentage: z.number().optional(), // Override with project-level CP %
 });
 
 export async function POST(
@@ -60,9 +62,9 @@ export async function POST(
       );
     }
 
-    const { location, useEvaluated, effectiveDate, projectId } = validated;
+    const { location, useEvaluated, effectiveDate, projectId, projectOcmPercentage, projectCpPercentage } = validated;
     
-    console.log(`Instantiating template with location: "${location}", projectId: ${projectId}`);
+    console.log(`Instantiating template with location: "${location}", projectId: ${projectId}, OCM: ${projectOcmPercentage}%, CP: ${projectCpPercentage}%`);
 
     // Fetch project for hauling configuration
     let haulingCostPerCuM = 0;
@@ -299,8 +301,13 @@ export async function POST(
     const materialCostTotal = materialEntries.reduce((sum, item) => sum + item.amount, 0);
     
     const directCost = laborCostTotal + equipmentCostTotal + materialCostTotal;
-    const ocmCost = directCost * (template.ocmPercentage / 100);
-    const cpCost = directCost * (template.cpPercentage / 100);
+    
+    // Use project-level percentages if provided, otherwise fall back to template percentages
+    const ocmPercentage = projectOcmPercentage !== undefined ? projectOcmPercentage : template.ocmPercentage;
+    const cpPercentage = projectCpPercentage !== undefined ? projectCpPercentage : template.cpPercentage;
+    
+    const ocmCost = directCost * (ocmPercentage / 100);
+    const cpCost = directCost * (cpPercentage / 100);
     const subtotalWithMarkup = directCost + ocmCost + cpCost;
     const vatCost = subtotalWithMarkup * (template.vatPercentage / 100);
     const totalCost = subtotalWithMarkup + vatCost;
@@ -327,9 +334,9 @@ export async function POST(
       
       // Cost breakdown
       directCost,
-      ocmPercentage: template.ocmPercentage,
+      ocmPercentage: ocmPercentage,
       ocmCost,
-      cpPercentage: template.cpPercentage,
+      cpPercentage: cpPercentage,
       cpCost,
       subtotalWithMarkup,
       vatPercentage: template.vatPercentage,
