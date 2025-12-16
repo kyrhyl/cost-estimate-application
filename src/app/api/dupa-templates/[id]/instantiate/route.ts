@@ -158,7 +158,7 @@ export async function POST(
             .lean();
           
           if (price) {
-            unitCost = price.unitPrice;
+            unitCost = price.unitCost;
           }
         }
 

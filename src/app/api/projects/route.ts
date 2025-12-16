@@ -8,17 +8,17 @@ const ProjectSchema = z.object({
   projectLocation: z.string().min(1, 'Project location is required'),
   district: z.string().default('Bukidnon 1st'),
   implementingOffice: z.string().default('DPWH Bukidnon 1st District Engineering Office'),
-  appropriation: z.number().min(0).default(0),
+  appropriation: z.string().optional().default(''),
   contractId: z.string().optional(),
   projectType: z.string().optional(),
   status: z
     .enum(['Planning', 'Approved', 'Ongoing', 'Completed', 'Cancelled'])
     .default('Planning'),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   description: z.string().optional(),
-  haulingCostPerKm: z.number().min(0).default(0),
-  distanceFromOffice: z.number().min(0).default(0),
+  haulingCostPerKm: z.coerce.number().min(0).default(0),
+  distanceFromOffice: z.coerce.number().min(0).default(0),
 });
 
 // GET /api/projects - List projects with filtering
