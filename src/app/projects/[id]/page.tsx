@@ -162,7 +162,9 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
         setQuantity(1);
         fetchBOQ();
       } else {
-        alert('Failed to add BOQ item: ' + createResult.error);
+        const errorMsg = createResult.error + (createResult.details ? '\n\nDetails: ' + createResult.details : '');
+        console.error('BOQ creation failed:', createResult);
+        alert('Failed to add BOQ item: ' + errorMsg);
       }
     } catch (error) {
       console.error('Failed to add BOQ item:', error);

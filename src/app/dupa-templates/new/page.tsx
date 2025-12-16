@@ -69,7 +69,11 @@ export default function NewDUPATemplatePage() {
           setEquipmentOptions(eqJson.data.map((e: any) => ({ _id: e._id, description: e.description })));
         }
         if (matJson.success) {
-          setMaterialOptions(matJson.data.map((m: any) => ({ materialCode: m.materialCode, description: m.description, unit: m.unit })));
+          setMaterialOptions(matJson.data.map((m: any) => ({ 
+            materialCode: m.materialCode, 
+            description: m.materialDescription, 
+            unit: m.unit 
+          })));
         }
       } catch (e) {
         console.error('Failed to load master data', e);
@@ -119,9 +123,15 @@ export default function NewDUPATemplatePage() {
 
   // Material handlers
   const addMaterialEntry = () => {
+    const firstMaterial = materialOptions.length > 0 ? materialOptions[0] : null;
     setMaterialTemplate([
       ...materialTemplate,
-      { materialCode: '', description: '', unit: '', quantity: 1 },
+      { 
+        materialCode: firstMaterial?.materialCode || '', 
+        description: firstMaterial?.description || 'N/A', 
+        unit: firstMaterial?.unit || '', 
+        quantity: 1 
+      },
     ]);
   };
 
@@ -362,77 +372,86 @@ export default function NewDUPATemplatePage() {
             </div>
 
             {laborTemplate.length === 0 ? (
-              <p className="text-gray-500">No labor entries. Click "Add Labor" to begin.</p>
+              <p className="text-gray-500">No labor entries. Click &quot;Add Labor&quot; to begin.</p>
             ) : (
-              <div className="space-y-4">
-                {laborTemplate.map((labor, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Designation
-                        </label>
-                        <select
-                          value={labor.designation}
-                          onChange={(e) =>
-                            updateLaborEntry(index, 'designation', e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select designation</option>
-                          <option value="Foreman">Foreman</option>
-                          <option value="Chief of Party">Chief of Party</option>
-                          <option value="Skilled Labor">Skilled Labor</option>
-                          <option value="Unskilled Labor">Unskilled Labor</option>
-                          <option value="Mason">Mason</option>
-                          <option value="Carpenter">Carpenter</option>
-                          <option value="Electrician">Electrician</option>
-                          <option value="Plumber">Plumber</option>
-                          <option value="Painter">Painter</option>
-                          <option value="Welder">Welder</option>
-                          <option value="Equipment Operator">Equipment Operator</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          No. of Persons
-                        </label>
-                        <input
-                          type="number"
-                          value={labor.noOfPersons}
-                          onChange={(e) =>
-                            updateLaborEntry(index, 'noOfPersons', Number(e.target.value))
-                          }
-                          min="1"
-                          step="0.1"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          No. of Hours
-                        </label>
-                        <input
-                          type="number"
-                          value={labor.noOfHours}
-                          onChange={(e) =>
-                            updateLaborEntry(index, 'noOfHours', Number(e.target.value))
-                          }
-                          min="0.1"
-                          step="0.1"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeLaborEntry(index)}
-                      className="mt-2 text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Designation
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        No. of Persons
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        No. of Hours
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {laborTemplate.map((labor, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-2">
+                          <select
+                            value={labor.designation}
+                            onChange={(e) =>
+                              updateLaborEntry(index, 'designation', e.target.value)
+                            }
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
+                          >
+                            <option value="">Select designation</option>
+                            <option value="Foreman">Foreman</option>
+                            <option value="Leadman">Leadman</option>
+                            <option value="Equipment Operator - Heavy">Equipment Operator - Heavy</option>
+                            <option value="Equipment Operator - High Skilled">Equipment Operator - High Skilled</option>
+                            <option value="Equipment Operator - Light Skilled">Equipment Operator - Light Skilled</option>
+                            <option value="Driver">Driver</option>
+                            <option value="Skilled Labor">Skilled Labor</option>
+                            <option value="Semi-Skilled Labor">Semi-Skilled Labor</option>
+                            <option value="Unskilled Labor">Unskilled Labor</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            value={labor.noOfPersons}
+                            onChange={(e) =>
+                              updateLaborEntry(index, 'noOfPersons', Number(e.target.value))
+                            }
+                            min="0.01"
+                            step="0.01"
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            value={labor.noOfHours}
+                            onChange={(e) =>
+                              updateLaborEntry(index, 'noOfHours', Number(e.target.value))
+                            }
+                            min="0.01"
+                            step="0.01"
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => removeLaborEntry(index)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -457,16 +476,16 @@ export default function NewDUPATemplatePage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Equipment
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Units
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Hours
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Actions
                       </th>
                     </tr>
@@ -474,18 +493,23 @@ export default function NewDUPATemplatePage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {equipmentTemplate.map((equip, index) => (
                       <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-2">
                           {loadingOptions ? (
                             <div className="text-gray-500">Loading equipment...</div>
                           ) : (
                             <select
-                              value={equip.equipmentId}
+                              value={equip.equipmentId || ''}
                               onChange={(e) => {
                                 const selected = equipmentOptions.find(o => o._id === e.target.value);
-                                updateEquipmentEntry(index, 'equipmentId', e.target.value);
-                                updateEquipmentEntry(index, 'description', selected ? selected.description : '');
+                                const updated = [...equipmentTemplate];
+                                updated[index] = {
+                                  ...updated[index],
+                                  equipmentId: e.target.value,
+                                  description: selected ? selected.description : ''
+                                };
+                                setEquipmentTemplate(updated);
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                             >
                               <option value="">Select equipment</option>
                               {equipmentOptions.map((opt) => (
@@ -494,7 +518,7 @@ export default function NewDUPATemplatePage() {
                             </select>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-2">
                           <input
                             type="number"
                             value={equip.noOfUnits}
@@ -503,10 +527,10 @@ export default function NewDUPATemplatePage() {
                             }
                             min="0.1"
                             step="0.1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-2">
                           <input
                             type="number"
                             value={equip.noOfHours}
@@ -515,10 +539,10 @@ export default function NewDUPATemplatePage() {
                             }
                             min="0.1"
                             step="0.1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-4 py-2">
                           <button
                             type="button"
                             onClick={() => removeEquipmentEntry(index)}
@@ -549,22 +573,22 @@ export default function NewDUPATemplatePage() {
             </div>
 
             {materialTemplate.length === 0 ? (
-              <p className="text-gray-500">No material entries. Click "Add Material" to begin.</p>
+              <p className="text-gray-500">No material entries. Click &quot;Add Material&quot; to begin.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase" colSpan={2}>
                         Material
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Unit
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Quantity
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Actions
                       </th>
                     </tr>
@@ -572,49 +596,53 @@ export default function NewDUPATemplatePage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {materialTemplate.map((material, index) => (
                       <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-2" colSpan={2}>
                           {loadingOptions ? (
                             <div className="text-gray-500">Loading materials...</div>
                           ) : (
                             <select
-                              value={material.materialCode}
+                              value={material.materialCode || ''}
                               onChange={(e) => {
                                 const selected = materialOptions.find(o => o.materialCode === e.target.value);
-                                updateMaterialEntry(index, 'materialCode', e.target.value);
-                                updateMaterialEntry(index, 'description', selected ? selected.description : '');
-                                updateMaterialEntry(index, 'unit', selected ? selected.unit : '');
+                                const updated = [...materialTemplate];
+                                updated[index] = {
+                                  ...updated[index],
+                                  materialCode: e.target.value,
+                                  description: selected ? selected.description : 'N/A',
+                                  unit: selected ? selected.unit : ''
+                                };
+                                setMaterialTemplate(updated);
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                             >
                               <option value="">Select material</option>
                               {materialOptions.map((opt) => (
-                                <option key={opt.materialCode} value={opt.materialCode}>{opt.description} ({opt.materialCode})</option>
+                                <option key={opt.materialCode} value={opt.materialCode}>{opt.description}</option>
                               ))}
                             </select>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-2">
                           <input
                             type="text"
                             value={material.unit}
-                            onChange={(e) => updateMaterialEntry(index, 'unit', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            placeholder="e.g., kg, bag, cu.m."
+                            readOnly
+                            className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-50 text-sm"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-2">
                           <input
                             type="number"
                             value={material.quantity}
                             onChange={(e) =>
                               updateMaterialEntry(index, 'quantity', Number(e.target.value))
                             }
-                            min="0.01"
-                            step="0.01"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            min="0.001"
+                            step="0.001"
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-4 py-2">
                           <button
                             type="button"
                             onClick={() => removeMaterialEntry(index)}

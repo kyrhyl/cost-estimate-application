@@ -115,7 +115,7 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
     try {
       const response = await fetch('/api/master/equipment');
       const result = await response.json();
-      if (result.success) {
+      if (result.success && Array.isArray(result.data)) {
         setEquipment(result.data);
       }
     } catch (error) {
@@ -127,7 +127,7 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
     try {
       const response = await fetch('/api/master/materials?active=true');
       const result = await response.json();
-      if (result.success) {
+      if (result.success && Array.isArray(result.data)) {
         setMaterials(result.data);
       }
     } catch (error) {
@@ -195,8 +195,8 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
     setMaterialItems([
       ...materialItems,
       { 
-        materialCode: firstMaterial.materialCode, 
-        description: firstMaterial.materialDescription, 
+        materialCode: firstMaterial.materialCode || '', 
+        description: firstMaterial.materialDescription || 'N/A', 
         unit: firstMaterial.unit, 
         quantity: 1 
       },
@@ -245,21 +245,28 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
 
     try {
       const response = await fetch(`/api/dupa-templates/${params.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(templateData),
       });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Response not OK:', response.status, text);
+        throw new Error(`Server returned ${response.status}: ${text}`);
+      }
 
       const result = await response.json();
 
       if (result.success) {
         router.push('/dupa-templates');
       } else {
-        alert('Failed to update template: ' + result.error);
+        console.error('Update failed:', result);
+        alert('Failed to update template: ' + (result.error || 'Unknown error') + (result.details ? '\nDetails: ' + result.details : ''));
       }
     } catch (error) {
-      console.error('Failed to create template:', error);
-      alert('Failed to create template');
+      console.error('Failed to update template:', error);
+      alert('Failed to update template: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setSaving(false);
     }

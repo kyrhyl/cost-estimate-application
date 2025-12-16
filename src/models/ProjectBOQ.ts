@@ -11,7 +11,7 @@ export interface IComputedLabor {
 
 // Computed equipment item with snapshot of rates
 export interface IComputedEquipment {
-  equipmentId: Types.ObjectId;
+  equipmentId?: Types.ObjectId;
   description: string;
   noOfUnits: number;
   noOfHours: number;
@@ -80,7 +80,7 @@ const ComputedLaborSchema = new Schema<IComputedLabor>({
 }, { _id: false });
 
 const ComputedEquipmentSchema = new Schema<IComputedEquipment>({
-  equipmentId: { type: Schema.Types.ObjectId, ref: 'Equipment', required: true },
+  equipmentId: { type: Schema.Types.ObjectId, ref: 'Equipment', required: false },
   description: { type: String, required: true },
   noOfUnits: { type: Number, required: true },
   noOfHours: { type: Number, required: true },

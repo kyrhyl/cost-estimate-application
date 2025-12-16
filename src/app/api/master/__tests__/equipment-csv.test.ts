@@ -261,7 +261,7 @@ CSV-013,Valid Equipment 2,Complete 13,M13,1300,650,13000,6500`;
       
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
-      expect(data.error).toContain('row 3') || expect(data.error).toContain('CSV-012');
+      expect(data.error).toMatch(/row 3|CSV-012/);
     });
 
     it('should handle empty CSV', async () => {
