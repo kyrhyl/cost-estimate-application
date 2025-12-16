@@ -423,9 +423,6 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     }
   };
 
-  const totalDirectCost = boqItems.reduce((sum, item) => sum + item.totalAmount, 0);
-  const indirectCosts = calculateIndirectCosts(totalDirectCost);
-
   if (loading || !project) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -433,6 +430,32 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
       </div>
     );
   }
+
+  const totalDirectCost = boqItems.reduce((sum, item) => sum + item.totalAmount, 0);
+  const indirectCosts = calculateIndirectCosts(totalDirectCost);
+  
+  // Calculate breakdown of costs from BOQ items
+  const laborTotal = boqItems.reduce((sum, item: any) => {
+    const laborCost = (item.laborItems || []).reduce((lsum: number, l: any) => lsum + (l.amount || 0), 0);
+    return sum + (laborCost * (item.quantity || 1));
+  }, 0);
+  
+  const materialTotal = boqItems.reduce((sum, item: any) => {
+    const materialCost = (item.materialItems || []).reduce((msum: number, m: any) => msum + (m.amount || 0), 0);
+    return sum + (materialCost * (item.quantity || 1));
+  }, 0);
+  
+  const equipmentTotal = boqItems.reduce((sum, item: any) => {
+    const equipmentCost = (item.equipmentItems || []).reduce((esum: number, e: any) => esum + (e.amount || 0), 0);
+    return sum + (equipmentCost * (item.quantity || 1));
+  }, 0);
+  
+  const ocmAndCp = indirectCosts.ocmAmount + indirectCosts.contractorsProfitAmount;
+  const vat = (totalDirectCost + ocmAndCp) * 0.12;
+  const totalConstructionCost = totalDirectCost + ocmAndCp + vat;
+  const eaoPercentage = 1;
+  const eaoAmount = project.allotedAmount ? project.allotedAmount * (eaoPercentage / 100) : 0;
+  const totalEstimatedCost = totalConstructionCost + eaoAmount;
 
   return (
     <div className="container mx-auto p-6">
@@ -659,15 +682,287 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
             </div>
           </div>
 
-          {/* Description Section */}
-          {project.description && (
-            <div className="mt-4 mb-3">
-              <div className="font-semibold text-[10px] mb-1">PROJECT DESCRIPTION:</div>
-              <div className="border border-gray-400 px-2 py-1 text-[10px] leading-relaxed">
-                {project.description}
-              </div>
+          {/* Description of Works to be Done */}
+          <div className="mt-4 mb-3">
+            <table className="w-full border-collapse text-[10px]">
+              <thead>
+                <tr className="bg-slate-700 text-white">
+                  <th className="border border-black px-2 py-2 text-center" colSpan={3}>Description of Works to be Done</th>
+                  <th className="border border-black px-2 py-2 text-center">Quantity</th>
+                  <th className="border border-black px-2 py-2 text-center">Unit</th>
+                  <th className="border border-black px-2 py-2 text-center" colSpan={2}>As Submitted</th>
+                  <th className="border border-black px-2 py-2 text-center" colSpan={2}>As Evaluated</th>
+                </tr>
+                <tr className="bg-slate-700 text-white">
+                  <th className="border border-black px-2 py-1 text-center" colSpan={3}></th>
+                  <th className="border border-black px-2 py-1 text-center"></th>
+                  <th className="border border-black px-2 py-1 text-center"></th>
+                  <th className="border border-black px-2 py-1 text-center">% Total</th>
+                  <th className="border border-black px-2 py-1 text-center">Total Direct Cost</th>
+                  <th className="border border-black px-2 py-1 text-center">% Total</th>
+                  <th className="border border-black px-2 py-1 text-center">Total Direct Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-black px-2 py-1">PART B</td>
+                  <td className="border border-black px-2 py-1" colSpan={2}>OTHER GENERAL REQUIREMENTS</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1 text-right">11%</td>
+                  <td className="border border-black px-2 py-1 text-right">144,384.19</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr className="font-semibold">
+                  <td className="border border-black px-2 py-1">DIVISION I</td>
+                  <td className="border border-black px-2 py-1" colSpan={2}>GENERAL</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1">PART C</td>
+                  <td className="border border-black px-2 py-1">EARTHWORK</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1 text-right">1%</td>
+                  <td className="border border-black px-2 py-1 text-right">6,549.73</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1">PART D</td>
+                  <td className="border border-black px-2 py-1">REINFORCED CONCRETE</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1 text-right">1%</td>
+                  <td className="border border-black px-2 py-1 text-right">18,194.90</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr className="font-semibold">
+                  <td className="border border-black px-2 py-1">DIVISION II</td>
+                  <td className="border border-black px-2 py-1" colSpan={2}>BUILDINGS</td>
+                  <td className="border border-black px-2 py-1">(SEE FORM DPWH-QMSP-13-11 Rev00)</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1">PART E</td>
+                  <td className="border border-black px-2 py-1">FINISHINGS AND OTHER CIVIL WORKS</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1 text-right">63%</td>
+                  <td className="border border-black px-2 py-1 text-right">787,962.83</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1">PART F</td>
+                  <td className="border border-black px-2 py-1">ELECTRICAL</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1 text-right">5%</td>
+                  <td className="border border-black px-2 py-1 text-right">69,189.25</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1">PART G</td>
+                  <td className="border border-black px-2 py-1">MECHANICAL</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1 text-right">19%</td>
+                  <td className="border border-black px-2 py-1 text-right">234,069.22</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1">PART L</td>
+                  <td className="border border-black px-2 py-1">FLOOD AND RIVER CONTROL AND DRAINAGE</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1 text-right">87%</td>
+                  <td className="border border-black px-2 py-1 text-right">1,091,221.10</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+                <tr className="font-semibold bg-gray-100">
+                  <td className="border border-black px-2 py-1" colSpan={4}></td>
+                  <td className="border border-black px-2 py-1 text-center">TOTAL:</td>
+                  <td className="border border-black px-2 py-1 text-right">100%</td>
+                  <td className="border border-black px-2 py-1 text-right">1,260,349.92</td>
+                  <td className="border border-black px-2 py-1"></td>
+                  <td className="border border-black px-2 py-1"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Two Column Layout: Equipment and Expenditures */}
+          <div className="grid grid-cols-2 gap-2 mt-4 mb-3 items-start">
+            {/* Left Column: Minimum Equipment Requirement */}
+            <div className="flex flex-col h-full">
+              <div className="font-semibold text-[10px] mb-1">Minimum Equipment Requirement:</div>
+              <table className="w-full border-collapse text-[10px] flex-1">
+                <thead>
+                  <tr className="bg-slate-700 text-white">
+                    <th className="border border-black px-2 py-1.5">Equipment Description</th>
+                    <th className="border border-black px-2 py-1.5 text-center">Capacity</th>
+                    <th className="border border-black px-2 py-1.5 text-center">Number of Equipment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-black px-2 py-1 h-6"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 h-6"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 h-6"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 h-6"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">(SEE FORM DPWH-QMSP-13-12 Rev00)</td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 h-6"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 h-6"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 h-6"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          )}
+
+            {/* Right Column: Breakdown of Expenditures */}
+            <div className="flex flex-col h-full">
+              <div className="font-semibold text-[10px] mb-1">Breakdown of Expenditures:</div>
+              <table className="w-full border-collapse text-[10px] flex-1">
+                <thead>
+                  <tr className="bg-slate-700 text-white">
+                    <th className="border border-black px-2 py-1.5 w-8 text-center"></th>
+                    <th className="border border-black px-2 py-1.5">Description</th>
+                    <th className="border border-black px-2 py-1.5 text-center">As Submitted</th>
+                    <th className="border border-black px-2 py-1.5 text-center">As Evaluated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">A</td>
+                    <td className="border border-black px-2 py-1">Labor</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {laborTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">B</td>
+                    <td className="border border-black px-2 py-1">Materials</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {materialTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">C</td>
+                    <td className="border border-black px-2 py-1">Equipment</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {equipmentTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">D</td>
+                    <td className="border border-black px-2 py-1">Total Direct Cost (A+B+C)</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {totalDirectCost.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">E</td>
+                    <td className="border border-black px-2 py-1">Overhead, Contingencies and Miscellaneous (OCM) Expenses and Contractor's Profit (CP)</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {ocmAndCp.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">F</td>
+                    <td className="border border-black px-2 py-1">Value Added Tax (VAT)</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {vat.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">G</td>
+                    <td className="border border-black px-2 py-1">Total Construction Cost (D+E+F)</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {totalConstructionCost.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black px-2 py-1 text-center">H</td>
+                    <td className="border border-black px-2 py-1">Engineering & Administrative Overhead (EAO).</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>{eaoPercentage}</span>
+                        <span className="px-1">%</span>
+                        <span>{eaoAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                  <tr className="font-semibold bg-gray-100">
+                    <td className="border border-black px-2 py-1 text-center">I</td>
+                    <td className="border border-black px-2 py-1">TOTAL ESTIMATED COST</td>
+                    <td className="border border-black px-2 py-1 text-right">
+                      {totalEstimatedCost.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="border border-black px-2 py-1"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="mt-4 flex gap-2">
