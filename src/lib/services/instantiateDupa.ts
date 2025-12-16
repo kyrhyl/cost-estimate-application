@@ -3,7 +3,7 @@ import LaborRate from '@/models/LaborRate';
 import Equipment from '@/models/Equipment';
 import Material from '@/models/Material';
 import Project from '@/models/Project';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/db/connect';
 
 // =============================================
 // Computed DUPA Instance Interfaces

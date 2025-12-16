@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/db/connect';
 import Project from '@/models/Project';
 
 // GET /api/projects/:id

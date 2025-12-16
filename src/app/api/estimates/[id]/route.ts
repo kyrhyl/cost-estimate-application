@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/lib/db/connect';
 import Estimate from '@/models/Estimate';
 
 // GET /api/estimates/:id - Get a specific estimate
@@ -41,7 +41,7 @@ export async function PUT(
     
     const body = await request.json();
     const RateItem = (await import('@/models/RateItem')).default;
-    const { computeLineItemEstimate } = await import('@/lib/pricing-engine');
+    const { computeLineItemEstimate } = await import('@/lib/calc/estimate');
     
     // Validate required fields
     if (!body.projectName || !body.projectLocation) {

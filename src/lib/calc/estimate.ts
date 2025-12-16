@@ -1,4 +1,10 @@
-import { IRateItem, ILaborEntry, IEquipmentEntry, IMaterialEntry } from '@/models/RateItem';
+import { IRateItem } from '@/models/RateItem';
+
+// Import calculation modules
+import { computeLaborCost } from './labor';
+import { computeEquipmentCost } from './equipment';
+import { computeMaterialCost } from './materials';
+import { computeAddOns, type AddOnResult } from './addons';
 
 // =============================================
 // Type Definitions
@@ -41,113 +47,11 @@ export interface LineItemEstimate {
   breakdown: CostBreakdown;
 }
 
-// =============================================
-// LABOR COST COMPUTATION
-// =============================================
+// Re-export AddOnResult for backwards compatibility
+export type { AddOnResult };
 
-/**
- * Compute total labor cost from labor entries
- * Formula: Σ(noOfPersons × noOfHours × hourlyRate)
- */
-export function computeLaborCost(laborEntries: ILaborEntry[]): number {
-  return laborEntries.reduce((total, entry) => {
-    const amount = entry.noOfPersons * entry.noOfHours * entry.hourlyRate;
-    return total + amount;
-  }, 0);
-}
-
-// =============================================
-// EQUIPMENT COST COMPUTATION
-// =============================================
-
-/**
- * Compute total equipment cost from equipment entries
- * Formula: Σ(noOfUnits × noOfHours × hourlyRate)
- * 
- * Special case: "Minor Tools" is typically 10% of labor cost
- * If nameAndCapacity includes "Minor Tools" and hourlyRate is 0,
- * it should be calculated separately as 10% of labor
- */
-export function computeEquipmentCost(
-  equipmentEntries: IEquipmentEntry[],
-  laborCost?: number
-): number {
-  return equipmentEntries.reduce((total, entry) => {
-    // Check if this is "Minor Tools" entry
-    const isMinorTools = entry.nameAndCapacity.toLowerCase().includes('minor tools');
-    
-    if (isMinorTools && laborCost !== undefined) {
-      // Minor Tools = 10% of Labor Cost (as per screenshot)
-      return total + (laborCost * 0.10);
-    } else {
-      // Standard equipment calculation
-      const amount = entry.noOfUnits * entry.noOfHours * entry.hourlyRate;
-      return total + amount;
-    }
-  }, 0);
-}
-
-// =============================================
-// MATERIAL COST COMPUTATION
-// =============================================
-
-/**
- * Compute total material cost from material entries
- * Formula: Σ(quantity × unitCost)
- */
-export function computeMaterialCost(materialEntries: IMaterialEntry[]): number {
-  return materialEntries.reduce((total, entry) => {
-    const amount = entry.quantity * entry.unitCost;
-    return total + amount;
-  }, 0);
-}
-
-// =============================================
-// ADD-ONS COMPUTATION
-// =============================================
-
-/**
- * Compute add-ons based on direct cost and percentages
- * 
- * Formula from UPA screenshot (verified against actual values):
- * - Direct Unit Cost = Labor + Equipment + Material
- * - OCM (Overhead, Contingencies & Misc) = Direct Cost × OCM%
- * - CP (Contractor's Profit) = Direct Cost × CP%  [Note: Also on Direct Cost, not cumulative]
- * - Subtotal = Direct Cost + OCM + CP
- * - VAT (Value Added Tax) = Subtotal × VAT%
- * - Total Unit Cost = Subtotal + VAT
- * 
- * Note: Based on screenshot values, both OCM and CP are calculated on the original
- * direct cost, not sequentially. VAT is then applied to the subtotal.
- */
-export interface AddOnResult {
-  ocm: number;
-  cp: number;
-  vat: number;
-  total: number;
-}
-
-export function computeAddOns(
-  directCost: number,
-  ocmPercent: number,
-  cpPercent: number,
-  vatPercent: number
-): AddOnResult {
-  // Step 1: Apply OCM to direct cost
-  const ocm = directCost * (ocmPercent / 100);
-  
-  // Step 2: Apply CP to direct cost (not to subtotal!)
-  const cp = directCost * (cpPercent / 100);
-  
-  // Step 3: Calculate subtotal
-  const subtotal = directCost + ocm + cp;
-  
-  // Step 4: Apply VAT to subtotal
-  const vat = subtotal * (vatPercent / 100);
-  const total = subtotal + vat;
-  
-  return { ocm, cp, vat, total };
-}
+// Re-export calculation functions for backwards compatibility
+export { computeLaborCost, computeEquipmentCost, computeMaterialCost, computeAddOns };
 
 // =============================================
 // MAIN PRICING ENGINE
@@ -257,16 +161,6 @@ export function computeLineItemEstimate(
   };
 }
 
-/**
- * Helper function to format currency (Philippine Peso)
- */
-export function formatCurrency(amount: number): string {
-  return `₱${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
-}
-
-/**
- * Helper function to round to 2 decimal places
- */
-export function roundTo2Decimals(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+// Re-export utility functions for backwards compatibility
+export { formatCurrency } from '../utils/format';
+export { roundTo2Decimals, round } from '../utils/rounding';
