@@ -27,6 +27,9 @@ interface ComputedMaterial {
   quantity: number;
   unitCost: number;
   amount: number;
+  haulingIncluded?: boolean;
+  basePrice?: number;
+  haulingCost?: number;
 }
 
 interface BOQItem {
@@ -289,6 +292,12 @@ export default function BOQDetailPage({
                     Quantity
                   </th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                    Base Price
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                    Hauling
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
                     Unit Cost
                   </th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
@@ -304,6 +313,18 @@ export default function BOQDetailPage({
                     <td className="px-4 py-2 text-sm">{item.unit}</td>
                     <td className="px-4 py-2 text-sm text-right">{item.quantity.toFixed(3)}</td>
                     <td className="px-4 py-2 text-sm text-right">
+                      ₱{(item.basePrice || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-right">
+                      {item.haulingIncluded ? (
+                        <span className="text-blue-600">
+                          +₱{(item.haulingCost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-right font-medium">
                       ₱{item.unitCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-4 py-2 text-sm text-right font-medium">
@@ -312,7 +333,7 @@ export default function BOQDetailPage({
                   </tr>
                 ))}
                 <tr className="bg-gray-50 font-semibold">
-                  <td colSpan={5} className="px-4 py-2 text-sm text-right">
+                  <td colSpan={7} className="px-4 py-2 text-sm text-right">
                     Total Materials:
                   </td>
                   <td className="px-4 py-2 text-sm text-right">

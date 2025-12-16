@@ -47,6 +47,9 @@ export interface IMaterialEntry {
   quantity: number;
   unitCost: number;
   amount: number;                  // computed: quantity × unitCost
+  haulingIncluded?: boolean;       // Indicates if hauling cost was added to unitCost
+  basePrice?: number;              // Base material price before hauling
+  haulingCost?: number;            // Hauling cost per unit
 }
 
 const materialEntrySchema = new Schema<IMaterialEntry>({
@@ -54,7 +57,10 @@ const materialEntrySchema = new Schema<IMaterialEntry>({
   unit: { type: String, required: true },
   quantity: { type: Number, required: true, default: 0 },
   unitCost: { type: Number, required: true, default: 0 },
-  amount: { type: Number, required: true, default: 0 }
+  amount: { type: Number, required: true, default: 0 },
+  haulingIncluded: { type: Boolean, default: false },
+  basePrice: { type: Number, default: 0 },
+  haulingCost: { type: Number, default: 0 }
 }, { _id: false });
 
 // =============================================

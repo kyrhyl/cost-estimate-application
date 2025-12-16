@@ -27,6 +27,9 @@ export interface IComputedMaterial {
   quantity: number;
   unitCost: number; // Snapshot from MaterialPrice at creation time
   amount: number;
+  haulingIncluded?: boolean; // Whether hauling cost was added
+  basePrice?: number; // Base material price before hauling
+  haulingCost?: number; // Hauling cost per unit
 }
 
 // ProjectBOQ stores computed instances of DUPA templates for a specific project
@@ -94,7 +97,10 @@ const ComputedMaterialSchema = new Schema<IComputedMaterial>({
   unit: { type: String, required: true },
   quantity: { type: Number, required: true },
   unitCost: { type: Number, required: true },
-  amount: { type: Number, required: true }
+  amount: { type: Number, required: true },
+  haulingIncluded: { type: Boolean, default: false },
+  basePrice: { type: Number, default: 0 },
+  haulingCost: { type: Number, default: 0 }
 }, { _id: false });
 
 const ProjectBOQSchema = new Schema<IProjectBOQ>(

@@ -18,6 +18,7 @@ const UpdateMaterialSchema = z.object({
   unit: z.string().min(1, 'Unit is required').toUpperCase().optional(),
   basePrice: z.number().min(0, 'Base price must be non-negative').optional(),
   category: z.string().optional(),
+  includeHauling: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 

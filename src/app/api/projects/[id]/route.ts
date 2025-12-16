@@ -19,6 +19,20 @@ const ProjectUpdateSchema = z.object({
   description: z.string().optional(),
   haulingCostPerKm: z.number().min(0).optional(),
   distanceFromOffice: z.number().min(0).optional(),
+  haulingConfig: z.object({
+    materialName: z.string().optional(),
+    materialSource: z.string().optional(),
+    totalDistance: z.number().optional(),
+    freeHaulingDistance: z.number().optional(),
+    routeSegments: z.array(z.object({
+      terrain: z.string().optional(),
+      distanceKm: z.number(),
+      speedUnloadedKmh: z.number(),
+      speedLoadedKmh: z.number(),
+    })).optional(),
+    equipmentCapacity: z.number().optional(),
+    equipmentRentalRate: z.number().optional(),
+  }).optional(),
 });
 
 // GET /api/projects/:id - Get single project with estimates
@@ -44,6 +58,8 @@ export async function GET(
         { status: 404 }
       );
     }
+    
+    console.log('GET project haulingConfig:', JSON.stringify((project as any).haulingConfig, null, 2));
 
     // Get associated estimates count
     const estimatesCount = await Estimate.countDocuments({ projectId: params.id });
@@ -81,8 +97,12 @@ export async function PATCH(
 
     const body = await req.json();
 
+    console.log('PATCH /api/projects/:id received body:', JSON.stringify(body, null, 2));
+    
     // Validate input
     const validatedData = ProjectUpdateSchema.parse(body);
+    
+    console.log('Validated data:', JSON.stringify(validatedData, null, 2));
 
     // Check for duplicate contract ID if being updated
     if (validatedData.contractId) {

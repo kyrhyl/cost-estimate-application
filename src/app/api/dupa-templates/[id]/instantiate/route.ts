@@ -14,9 +14,11 @@ import DUPATemplate from '@/models/DUPATemplate';
 import RateItem from '@/models/RateItem';
 import LaborRate from '@/models/LaborRate';
 import Equipment from '@/models/Equipment';
-import MaterialPrice from '@/models/MaterialPrice';
+import Material from '@/models/Material';
+import Project from '@/models/Project';
 import mongoose from 'mongoose';
 import { z } from 'zod';
+import { computeHaulingCost } from '@/lib/calc/hauling';
 
 const InstantiateRequestSchema = z.object({
   location: z.string().min(1, 'Location is required'),
@@ -58,7 +60,81 @@ export async function POST(
       );
     }
 
-    const { location, useEvaluated, effectiveDate } = validated;
+    const { location, useEvaluated, effectiveDate, projectId } = validated;
+    
+    console.log(`Instantiating template with location: "${location}", projectId: ${projectId}`);
+
+    // Fetch project for hauling configuration
+    let haulingCostPerCuM = 0;
+    if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+      const project: any = await Project.findById(projectId).lean();
+      console.log('Project fetched:', {
+        name: project?.projectName,
+        distanceFromOffice: project?.distanceFromOffice,
+        haulingCostPerKm: project?.haulingCostPerKm,
+        hasHaulingConfig: !!project?.haulingConfig
+      });
+      
+      if (project && project.distanceFromOffice && project.distanceFromOffice > 0) {
+        console.log(`Project distance: ${project.distanceFromOffice} km`);
+        
+        // Check if project has detailed hauling config
+        if (project.haulingConfig && project.haulingConfig.routeSegments) {
+          const config = project.haulingConfig;
+          const haulingTemplate = {
+            totalDistanceKm: config.totalDistance || project.distanceFromOffice,
+            freeHaulingDistanceKm: config.freeHaulingDistance || 3,
+            routeSegments: config.routeSegments,
+            equipmentHourlyRatePhp: config.equipmentRentalRate || 1420,
+            equipmentCapacityCuM: config.equipmentCapacity || 10,
+          };
+          console.log('Using project hauling config:', JSON.stringify(haulingTemplate, null, 2));
+          const haulingResult = computeHaulingCost(haulingTemplate);
+          console.log('Hauling calculation result:', JSON.stringify(haulingResult, null, 2));
+          haulingCostPerCuM = haulingResult.costPerCuMPhp;
+        } else {
+          // Fallback to simple calculation using default values
+          // Use DPWH standard dump truck rate (₱1,420/hr) as minimum
+          const DPWH_DUMP_TRUCK_RATE = 1420;
+          const TRUCK_CAPACITY_CUM = 6;
+          
+          const haulingEquipment: any = await Equipment.findOne({
+            category: { $regex: /truck|hauling|dump/i }
+          }).sort({ hourlyRate: 1 }).lean();
+          
+          // Use equipment rate if available and reasonable (> ₱500/hr), otherwise use DPWH standard
+          let equipmentRate = DPWH_DUMP_TRUCK_RATE;
+          if (haulingEquipment && haulingEquipment.hourlyRate >= 500) {
+            equipmentRate = haulingEquipment.hourlyRate;
+            console.log(`Using equipment: ${haulingEquipment.name || 'N/A'} at ₱${equipmentRate}/hr`);
+          } else {
+            console.log(`⚠️ No suitable hauling equipment found or rate too low, using DPWH standard ₱${DPWH_DUMP_TRUCK_RATE}/hr`);
+          }
+          
+          const haulingTemplate = {
+            totalDistanceKm: project.distanceFromOffice,
+            freeHaulingDistanceKm: 3,
+            routeSegments: [{
+              distanceKm: project.distanceFromOffice,
+              speedUnloadedKmh: 40,
+              speedLoadedKmh: 30,
+            }],
+            equipmentHourlyRatePhp: equipmentRate,
+            equipmentCapacityCuM: TRUCK_CAPACITY_CUM,
+          };
+          console.log('Fallback hauling config:', JSON.stringify(haulingTemplate, null, 2));
+          const haulingResult = computeHaulingCost(haulingTemplate);
+          console.log('Hauling calculation result:', JSON.stringify(haulingResult, null, 2));
+          haulingCostPerCuM = haulingResult.costPerCuMPhp;
+        }
+      } else if (project) {
+        console.log(`⚠️ Project has no distance or distance is 0 - hauling cost will be 0`);
+      }
+    } else {
+      console.log(`⚠️ No valid projectId provided - hauling cost will be 0`);
+    }
+    
+    console.log(`✅ Final hauling cost per cu.m.: ₱${haulingCostPerCuM.toFixed(2)}`);
 
     // Fetch template
     const template = await DUPATemplate.findById(id);
@@ -163,43 +239,57 @@ export async function POST(
     equipmentEntries.push(minorToolsEntry);
 
     // Instantiate material entries (filter out empty entries)
+    console.log(`Instantiating materials with hauling cost per cu.m.: ₱${haulingCostPerCuM.toFixed(2)}`);
     const materialEntries = await Promise.all(
       template.materialTemplate
         .filter((material: any) => material.materialCode && material.description) // Only process valid materials
         .map(async (material: any) => {
           let unitCost = 0;
+          let materialDoc: any = null;
 
           if (material.materialCode) {
-            // Query for most recent price at location
-            const priceQuery: any = {
-              materialCode: material.materialCode,
-              location,
-            };
-            
-            if (effectiveDate) {
-              priceQuery.effectiveDate = { $lte: new Date(effectiveDate) };
-            }
+            // Fetch the material to get base price and check if hauling should be included
+            materialDoc = await Material.findOne({ 
+              materialCode: material.materialCode 
+            }).lean();
 
-            const price: any = await MaterialPrice.findOne(priceQuery)
-              .sort({ effectiveDate: -1 })
-              .lean();
-            
-            if (price) {
-              unitCost = price.unitCost;
+            if (materialDoc) {
+              // Use base price from Material model (not location-specific)
+              unitCost = materialDoc.basePrice || 0;
+              
+              // Only add hauling cost if the material has includeHauling flag set to true
+              const includeHauling = materialDoc.includeHauling !== false; // Default to true if not set
+              if (includeHauling) {
+                unitCost += haulingCostPerCuM;
+                console.log(`Material ${material.materialCode}: Base price ₱${materialDoc.basePrice.toFixed(2)}, Hauling ₱${haulingCostPerCuM.toFixed(2)}, Total ₱${unitCost.toFixed(2)}`);
+              } else {
+                console.log(`Material ${material.materialCode}: Base price ₱${materialDoc.basePrice.toFixed(2)}, Hauling EXCLUDED (material setting), Total ₱${unitCost.toFixed(2)}`);
+              }
+            } else {
+              console.log(`Material ${material.materialCode}: Material not found in database`);
             }
           }
 
           const quantity = Number(material.quantity) || 0;
           const amount = quantity * unitCost;
+          const haulingWasAdded = materialDoc?.includeHauling !== false && haulingCostPerCuM > 0;
+          const basePrice = materialDoc?.basePrice || 0;
+          const haulingCostApplied = haulingWasAdded ? haulingCostPerCuM : 0;
           
-          return {
+          const result = {
             materialCode: material.materialCode.trim(),
             description: material.description.trim() || 'Material Item',
             unit: material.unit.trim() || 'unit',
             quantity,
             unitCost,
             amount: isNaN(amount) ? 0 : amount,
+            haulingIncluded: haulingWasAdded,
+            basePrice: basePrice,
+            haulingCost: haulingCostApplied,
           };
+          
+          console.log(`Material entry created:`, JSON.stringify(result, null, 2));
+          return result;
         })
     );
 
@@ -215,6 +305,12 @@ export async function POST(
     const vatCost = subtotalWithMarkup * (template.vatPercentage / 100);
     const totalCost = subtotalWithMarkup + vatCost;
     const unitCost = totalCost; // Cost per unit of measurement
+
+    // Debug: Log material entries before returning
+    console.log('Final material entries count:', materialEntries.length);
+    materialEntries.forEach((item, idx) => {
+      console.log(`Material ${idx}: basePrice=${item.basePrice}, haulingCost=${item.haulingCost}, unitCost=${item.unitCost}`);
+    });
 
     // Return computed data for BOQ creation
     const computedData = {

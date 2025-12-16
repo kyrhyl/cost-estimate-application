@@ -8,6 +8,7 @@ export interface IMaterial extends Document {
   unit: string;
   basePrice: number; // Base price before hauling cost
   category?: string; // e.g., 'MG01', 'MG02', etc.
+  includeHauling: boolean; // Whether to add hauling cost for this material
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -42,6 +43,10 @@ const MaterialSchema = new Schema<IMaterial>(
       type: String,
       trim: true,
       uppercase: true,
+    },
+    includeHauling: {
+      type: Boolean,
+      default: true, // By default, include hauling cost
     },
     isActive: {
       type: Boolean,

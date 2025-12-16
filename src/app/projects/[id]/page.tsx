@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+type TabView = 'details' | 'dupa' | 'hauling';
+
 interface Project {
   _id: string;
   projectName: string;
@@ -10,6 +12,8 @@ interface Project {
   district?: string;
   status: string;
   appropriation?: string;
+  distanceFromOffice?: number;
+  haulingCostPerKm?: number;
 }
 
 interface DUPATemplate {
@@ -34,6 +38,7 @@ interface BOQItem {
 
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabView>('details');
   const [project, setProject] = useState<Project | null>(null);
   const [boqItems, setBoqItems] = useState<BOQItem[]>([]);
   const [templates, setTemplates] = useState<DUPATemplate[]>([]);
@@ -42,12 +47,44 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
+  
+  // Hauling calculation state
+  const [materialName, setMaterialName] = useState('Sand & Gravel');
+  const [materialSource, setMaterialSource] = useState('');
+  const [totalDistance, setTotalDistance] = useState(0);
+  const [freeHaulingDistance, setFreeHaulingDistance] = useState(3);
+  const [routeSegments, setRouteSegments] = useState([
+    { terrain: 'Flat (Paved)', distanceKm: 0, speedUnloadedKmh: 55, speedLoadedKmh: 35 },
+    { terrain: 'Rolling (Paved)', distanceKm: 0, speedUnloadedKmh: 40, speedLoadedKmh: 30 },
+    { terrain: 'Mountainous (UnPaved)', distanceKm: 0, speedUnloadedKmh: 25, speedLoadedKmh: 15 },
+  ]);
+  const [equipmentCapacity, setEquipmentCapacity] = useState(10);
+  const [equipmentRentalRate, setEquipmentRentalRate] = useState(1420);
+  const [savingHauling, setSavingHauling] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     fetchProject();
     fetchBOQ();
     fetchTemplates();
   }, [params.id]);
+
+  useEffect(() => {
+    if (project) {
+      setTotalDistance(project.distanceFromOffice || 0);
+      
+      // Load saved hauling configuration if it exists
+      if ((project as any).haulingConfig) {
+        const config = (project as any).haulingConfig;
+        if (config.materialName) setMaterialName(config.materialName);
+        if (config.materialSource) setMaterialSource(config.materialSource);
+        if (config.freeHaulingDistance !== undefined) setFreeHaulingDistance(config.freeHaulingDistance);
+        if (config.routeSegments) setRouteSegments(config.routeSegments);
+        if (config.equipmentCapacity) setEquipmentCapacity(config.equipmentCapacity);
+        if (config.equipmentRentalRate) setEquipmentRentalRate(config.equipmentRentalRate);
+      }
+    }
+  }, [project]);
 
   const fetchProject = async () => {
     try {
@@ -174,6 +211,60 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     }
   };
 
+  const handleSaveHaulingConfig = async () => {
+    setSavingHauling(true);
+    try {
+      const payload = {
+        distanceFromOffice: totalDistance,
+        haulingConfig: {
+          materialName,
+          materialSource,
+          totalDistance,
+          freeHaulingDistance,
+          routeSegments,
+          equipmentCapacity,
+          equipmentRentalRate,
+        },
+      };
+      
+      console.log('Saving hauling config:', JSON.stringify(payload, null, 2));
+      
+      const response = await fetch(`/api/projects/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      console.log('Save response:', result);
+      
+      if (result.success) {
+        await fetchProject();
+        
+        // Automatically recalculate all BOQ items with new hauling costs
+        if (boqItems.length > 0) {
+          const recalcResult = await recalculateAllBOQItems();
+          if (recalcResult.success) {
+            alert(`✅ Hauling configuration saved!\n\n📊 Auto-recalculated ${recalcResult.successCount} BOQ item(s) with new hauling costs.`);
+          } else {
+            alert(`✅ Hauling configuration saved!\n\n⚠️ ${recalcResult.successCount} BOQ items recalculated, ${recalcResult.failCount} failed.`);
+          }
+        } else {
+          alert('✅ Hauling configuration saved successfully!');
+        }
+      } else {
+        console.error('Save failed:', result);
+        alert('Failed to save hauling configuration: ' + (result.error || 'Unknown error') + 
+              (result.details ? '\n\nDetails: ' + JSON.stringify(result.details) : ''));
+      }
+    } catch (error) {
+      console.error('Failed to save hauling config:', error);
+      alert('Failed to save hauling configuration');
+    } finally {
+      setSavingHauling(false);
+    }
+  };
+
   const handleDeleteBOQItem = async (id: string) => {
     if (!confirm('Are you sure you want to remove this BOQ item?')) return;
 
@@ -192,6 +283,89 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     } catch (error) {
       console.error('Failed to delete BOQ item:', error);
       alert('Failed to delete BOQ item');
+    }
+  };
+
+  // Internal function for recalculating (without UI prompts)
+  const recalculateAllBOQItems = async () => {
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const item of boqItems) {
+        try {
+          // Re-instantiate the template with current rates
+          const instantiateResponse = await fetch(`/api/dupa-templates/${(item as any).templateId._id || (item as any).templateId}/instantiate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: project?.projectLocation || 'Cabangasan',
+              projectId: params.id,
+            }),
+          });
+
+          const instantiateResult = await instantiateResponse.json();
+
+          if (instantiateResult.success) {
+            // Update the existing BOQ item with new calculated values
+            const updateResponse = await fetch(`/api/project-boq/${(item as any)._id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...instantiateResult.data,
+                quantity: item.quantity, // Preserve user's quantity
+              }),
+            });
+
+            const updateResult = await updateResponse.json();
+            if (updateResult.success) {
+              successCount++;
+            } else {
+              failCount++;
+              console.error('Failed to update BOQ item:', item, updateResult.error);
+            }
+          } else {
+            failCount++;
+            console.error('Failed to instantiate template for:', item, instantiateResult.error);
+          }
+        } catch (error) {
+          failCount++;
+          console.error('Error recalculating BOQ item:', item, error);
+        }
+      }
+
+      if (successCount > 0) {
+        await fetchBOQ();
+      }
+
+      return { success: failCount === 0, successCount, failCount };
+    } catch (error) {
+      console.error('Recalculation error:', error);
+      return { success: false, successCount, failCount };
+    }
+  };
+
+  const handleRecalculateAllBOQ = async () => {
+    if (!boqItems.length) {
+      alert('No BOQ items to recalculate');
+      return;
+    }
+
+    if (!confirm(`Recalculate ${boqItems.length} BOQ item(s) with current rates?\n\nThis will update:\n- Labor rates\n- Equipment rates\n- Material prices\n- Hauling costs\n\nExisting costs will be replaced with current values.`)) {
+      return;
+    }
+
+    setRecalculating(true);
+    try {
+      const result = await recalculateAllBOQItems();
+      
+      if (result.failCount === 0) {
+        alert(`✅ Successfully recalculated ${result.successCount} BOQ item(s)!`);
+      } else {
+        alert(`⚠️ Recalculation completed:\n✅ ${result.successCount} succeeded\n❌ ${result.failCount} failed`);
+      }
+    } finally {
+      setRecalculating(false);
     }
   };
 
@@ -224,10 +398,10 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
             )}
           </div>
           <button
-            onClick={() => router.push(`/projects/${params.id}/edit`)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+            onClick={() => router.push('/projects')}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
           >
-            Edit Project
+            ← Back to Projects
           </button>
         </div>
 
@@ -251,93 +425,475 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
 
-      {/* BOQ Items */}
+      {/* Tab Navigation */}
       <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">Bill of Quantities</h2>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
-          >
-            + Add BOQ Item
-          </button>
-        </div>
-
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Pay Item No.
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Description
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Unit
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Quantity
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Unit Cost
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Total Amount
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {boqItems.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    No BOQ items yet. Click "Add BOQ Item" to select a DUPA template.
-                  </td>
-                </tr>
-              ) : (
-                boqItems.map((item) => (
-                  <tr key={item._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium">{item.payItemNumber}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <div>{item.payItemDescription}</div>
-                      {item.category && (
-                        <div className="text-xs text-gray-500">{item.category}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{item.unitOfMeasurement}</td>
-                    <td className="px-4 py-3 text-sm text-right">
-                      {item.quantity.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right">
-                      ₱{item.unitCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right font-medium">
-                      ₱{item.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-sm space-x-3">
-                      <button
-                        onClick={() => router.push(`/projects/${params.id}/boq/${item._id}`)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        View DUPA
-                      </button>
-                      <button
-                        onClick={() => handleDeleteBOQItem(item._id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'details'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Project Details
+            </button>
+            <button
+              onClick={() => setActiveTab('dupa')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'dupa'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              DUPA / BOQ
+            </button>
+            <button
+              onClick={() => setActiveTab('hauling')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'hauling'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Hauling Distance
+            </button>
+          </nav>
         </div>
       </div>
+
+      {/* Project Details Tab */}
+      {activeTab === 'details' && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-2xl font-semibold mb-4">Project Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+              <div className="text-lg">{project.projectName}</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <div className="text-lg">{project.projectLocation}</div>
+            </div>
+            {project.district && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                <div className="text-lg">{project.district}</div>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <div className="text-lg">{project.status}</div>
+            </div>
+            {project.appropriation && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Appropriation</label>
+                <div className="text-lg">{project.appropriation}</div>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Distance from Office</label>
+              <div className="text-lg">{project.distanceFromOffice || 0} km</div>
+            </div>
+          </div>
+          <div className="mt-6">
+            <button
+              onClick={() => router.push(`/projects/${params.id}/edit`)}
+              className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700"
+            >
+              Edit Project Details
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* DUPA/BOQ Tab */}
+      {activeTab === 'dupa' && (
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold">Bill of Quantities</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRecalculateAllBOQ}
+                disabled={recalculating || boqItems.length === 0}
+                className={`px-6 py-2 rounded flex items-center gap-2 ${
+                  recalculating || boqItems.length === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                title="Recalculate all BOQ items with current labor/equipment/material/hauling rates"
+              >
+                {recalculating ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Recalculating...
+                  </>
+                ) : (
+                  <>
+                    🔄 Recalculate All BOQ
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+              >
+                + Add BOQ Item
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Pay Item No.
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Description
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Unit
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Quantity
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Unit Cost
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Total Amount
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {boqItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                      No BOQ items yet. Click "Add BOQ Item" to select a DUPA template.
+                    </td>
+                  </tr>
+                ) : (
+                  boqItems.map((item) => (
+                    <tr key={item._id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium">{item.payItemNumber}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <div>{item.payItemDescription}</div>
+                        {item.category && (
+                          <div className="text-xs text-gray-500">{item.category}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{item.unitOfMeasurement}</td>
+                      <td className="px-4 py-3 text-sm text-right">
+                        {item.quantity.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right">
+                        ₱{item.unitCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-medium">
+                        ₱{item.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-sm space-x-3">
+                        <button
+                          onClick={() => router.push(`/projects/${params.id}/boq/${item._id}`)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          View DUPA
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBOQItem(item._id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Hauling Distance Tab */}
+      {activeTab === 'hauling' && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-2xl font-semibold mb-4">DPWH Hauling Cost Computation - Aggregates</h2>
+          <p className="text-gray-600 mb-6">
+            Configure hauling cost calculation based on DPWH standards. This matches the official DPWH computation form for aggregates.
+          </p>
+
+          {/* Material Information */}
+          <div className="mb-6 border-b pb-4">
+            <h3 className="font-semibold text-lg mb-3">Material Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Material</label>
+                <input
+                  type="text"
+                  value={materialName}
+                  onChange={(e) => setMaterialName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g., Sand & Gravel"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Material Source</label>
+                <input
+                  type="text"
+                  value={materialSource}
+                  onChange={(e) => setMaterialSource(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g., Putangi River Quarry, Boac, Nabuos"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Distance Configuration */}
+          <div className="mb-6 border-b pb-4">
+            <h3 className="font-semibold text-lg mb-3">Distance Configuration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Total Hauling Distance (km)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={totalDistance}
+                  onChange={(e) => setTotalDistance(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g., 25.10"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Free Hauling (First km)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={freeHaulingDistance}
+                  onChange={(e) => setFreeHaulingDistance(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g., 3.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Chargeable Distance (km)</label>
+                <input
+                  type="number"
+                  value={(totalDistance - freeHaulingDistance).toFixed(2)}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Route Segments */}
+          <div className="mb-6 border-b pb-4">
+            <h3 className="font-semibold text-lg mb-3">Route Breakdown by Terrain</h3>
+            <div className="space-y-4">
+              {routeSegments.map((segment, index) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {segment.terrain}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={segment.distanceKm}
+                      onChange={(e) => {
+                        const newSegments = [...routeSegments];
+                        newSegments[index].distanceKm = parseFloat(e.target.value) || 0;
+                        setRouteSegments(newSegments);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="Distance (km)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Speed Unloaded (km/hr)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={segment.speedUnloadedKmh}
+                      onChange={(e) => {
+                        const newSegments = [...routeSegments];
+                        newSegments[index].speedUnloadedKmh = parseFloat(e.target.value) || 0;
+                        setRouteSegments(newSegments);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Speed Loaded (km/hr)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={segment.speedLoadedKmh}
+                      onChange={(e) => {
+                        const newSegments = [...routeSegments];
+                        newSegments[index].speedLoadedKmh = parseFloat(e.target.value) || 0;
+                        setRouteSegments(newSegments);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">
+                      Time: {(segment.distanceKm / segment.speedUnloadedKmh || 0).toFixed(4)} hr (unloaded)<br/>
+                      {(segment.distanceKm / segment.speedLoadedKmh || 0).toFixed(4)} hr (loaded)
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Equipment Configuration */}
+          <div className="mb-6 border-b pb-4">
+            <h3 className="font-semibold text-lg mb-3">Dump Truck Configuration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacity (cu.m. of Aggregates)</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={equipmentCapacity}
+                  onChange={(e) => setEquipmentCapacity(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g., 10"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rental Rate per Hour (₱)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={equipmentRentalRate}
+                  onChange={(e) => setEquipmentRentalRate(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g., 1420.00"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Calculation Results */}
+          {(() => {
+            const timeUnloaded = routeSegments.reduce((sum, seg) => sum + (seg.distanceKm / seg.speedUnloadedKmh || 0), 0);
+            const timeLoaded = routeSegments.reduce((sum, seg) => sum + (seg.distanceKm / seg.speedLoadedKmh || 0), 0);
+            const delayAllowance = (timeUnloaded + timeLoaded) * 0.10;
+            const maneuverAllowance = 0.25;
+            const totalCycleTime = timeUnloaded + timeLoaded + delayAllowance + maneuverAllowance;
+            const costPerTrip = totalCycleTime * equipmentRentalRate;
+            const costPerCuM = equipmentCapacity > 0 ? costPerTrip / equipmentCapacity : 0;
+
+            return (
+              <div className="bg-blue-50 p-6 rounded-lg mb-6">
+                <h3 className="font-semibold text-blue-900 mb-4 text-lg">DPWH Hauling Cost Computation Results</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-blue-800 mb-2">CYCLE TIME</h4>
+                    <div className="text-sm space-y-1">
+                      <p><strong>A. Without Load (where distance/velocity):</strong></p>
+                      {routeSegments.map((seg, idx) => (
+                        <p key={`a-${idx}`} className="ml-4">
+                          {seg.terrain}: {(seg.distanceKm / seg.speedUnloadedKmh || 0).toFixed(4)} hr
+                        </p>
+                      ))}
+                      <p className="font-semibold ml-4">Total Time A = {timeUnloaded.toFixed(3)} hr</p>
+                      
+                      <p className="mt-3"><strong>B. With Load (where distance/velocity):</strong></p>
+                      {routeSegments.map((seg, idx) => (
+                        <p key={`b-${idx}`} className="ml-4">
+                          {seg.terrain}: {(seg.distanceKm / seg.speedLoadedKmh || 0).toFixed(4)} hr
+                        </p>
+                      ))}
+                      <p className="font-semibold ml-4">Total Time B = {timeLoaded.toFixed(3)} hr</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm space-y-1">
+                      <p><strong>C. Allowance for Delay:</strong></p>
+                      <p className="ml-4">(A + B) × 10.00% = {delayAllowance.toFixed(3)} hr</p>
+                      
+                      <p className="mt-2"><strong>D. Allowance for Maneuver:</strong></p>
+                      <p className="ml-4">{maneuverAllowance.toFixed(3)} hr (15.00 min)</p>
+                      
+                      <p className="mt-2"><strong>E. Total Cycle Time:</strong></p>
+                      <p className="ml-4 font-semibold">A + B + C + D = {totalCycleTime.toFixed(4)} hr</p>
+                      
+                      <div className="mt-4 pt-4 border-t border-blue-300">
+                        <p><strong>Using Dump Truck:</strong></p>
+                        <p className="ml-4">Capacity: {equipmentCapacity} cu.m. of Aggregates</p>
+                        <p className="ml-4">Rental Rate: ₱{equipmentRentalRate.toFixed(2)} per hour</p>
+                        
+                        <p className="mt-3"><strong>Cost per Trip:</strong></p>
+                        <p className="ml-4">{totalCycleTime.toFixed(4)} × ₱{equipmentRentalRate.toFixed(2)} = ₱{costPerTrip.toFixed(2)}</p>
+                        
+                        <p className="mt-3 text-lg"><strong>HAULING COST PER CU.M.:</strong></p>
+                        <p className="ml-4 text-2xl font-bold text-blue-900">₱{costPerCuM.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-blue-700 mt-4 pt-4 border-t border-blue-300">
+                  <strong>Note:</strong> This hauling cost per cu.m. will be automatically added to material prices
+                  when you instantiate DUPA templates for this project's BOQ.
+                </p>
+              </div>
+            );
+          })()}
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSaveHaulingConfig}
+              disabled={savingHauling}
+              className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
+            >
+              {savingHauling ? 'Saving...' : 'Save Hauling Configuration'}
+            </button>
+            <button
+              onClick={() => {
+                setTotalDistance(project?.distanceFromOffice || 0);
+                setFreeHaulingDistance(3);
+                setMaterialName('Sand & Gravel');
+                setMaterialSource('');
+                setRouteSegments([
+                  { terrain: 'Flat (Paved)', distanceKm: 0, speedUnloadedKmh: 55, speedLoadedKmh: 35 },
+                  { terrain: 'Rolling (Paved)', distanceKm: 0, speedUnloadedKmh: 40, speedLoadedKmh: 30 },
+                  { terrain: 'Mountainous (UnPaved)', distanceKm: 0, speedUnloadedKmh: 25, speedLoadedKmh: 15 },
+                ]);
+                setEquipmentCapacity(10);
+                setEquipmentRentalRate(1420);
+              }}
+              className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300"
+            >
+              Reset to Defaults
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add BOQ Modal */}
       {showAddModal && (
@@ -382,7 +938,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
               <div className="bg-blue-50 p-3 rounded">
                 <p className="text-sm text-blue-700">
                   <strong>Note:</strong> The template will be instantiated with rates for{' '}
-                  <strong>{project.projectLocation}</strong>. Labor rates, equipment rates, and 
+                  <strong>{project?.projectLocation}</strong>. Labor rates, equipment rates, and 
                   material prices will be applied automatically based on this location.
                 </p>
               </div>

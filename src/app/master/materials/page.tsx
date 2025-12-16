@@ -9,6 +9,7 @@ interface Material {
   unit: string;
   basePrice: number;
   category?: string;
+  includeHauling: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -29,6 +30,7 @@ export default function MaterialsPage() {
     unit: '',
     basePrice: 0,
     category: '',
+    includeHauling: true,
     isActive: true,
   });
 
@@ -99,6 +101,7 @@ export default function MaterialsPage() {
       unit: material.unit,
       basePrice: material.basePrice,
       category: material.category || '',
+      includeHauling: material.includeHauling,
       isActive: material.isActive,
     });
     setShowForm(true);
@@ -151,6 +154,7 @@ export default function MaterialsPage() {
       unit: '',
       basePrice: 0,
       category: '',
+      includeHauling: true,
       isActive: true,
     });
   };
@@ -314,7 +318,17 @@ export default function MaterialsPage() {
                   </div>
                 </div>
 
-                <div className="mb-6">
+                <div className="mb-6 space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.includeHauling}
+                      onChange={(e) => setFormData({ ...formData, includeHauling: e.target.checked })}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Include Hauling Cost</span>
+                  </label>
+                  
                   <label className="flex items-center">
                     <input
                       type="checkbox"
@@ -371,6 +385,7 @@ export default function MaterialsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Base Price</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Hauling</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -392,6 +407,15 @@ export default function MaterialsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
                       ₱{material.basePrice.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        material.includeHauling
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {material.includeHauling ? '✓ Yes' : '✗ No'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <button
