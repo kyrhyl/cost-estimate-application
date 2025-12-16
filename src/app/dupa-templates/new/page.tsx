@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -43,11 +43,6 @@ export default function NewDUPATemplatePage() {
   const [equipmentTemplate, setEquipmentTemplate] = useState<EquipmentEntry[]>([]);
   const [materialTemplate, setMaterialTemplate] = useState<MaterialEntry[]>([]);
 
-  // Master data for dropdowns
-  const [equipmentOptions, setEquipmentOptions] = useState<Array<{ _id: string; description: string }>>([]);
-  const [materialOptions, setMaterialOptions] = useState<Array<{ materialCode: string; description: string; unit: string }>>([]);
-  const [loadingOptions, setLoadingOptions] = useState(true);
-
   // Add-ons
   const [ocmPercentage, setOcmPercentage] = useState(10);
   const [cpPercentage, setCpPercentage] = useState(8);
@@ -56,29 +51,6 @@ export default function NewDUPATemplatePage() {
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    const loadMasterData = async () => {
-      try {
-        const [eqRes, matRes] = await Promise.all([
-          fetch('/api/master/equipment'),
-          fetch('/api/master/materials')
-        ]);
-        const [eqJson, matJson] = await Promise.all([eqRes.json(), matRes.json()]);
-        if (eqJson.success) {
-          setEquipmentOptions(eqJson.data.map((e: any) => ({ _id: e._id, description: e.description })));
-        }
-        if (matJson.success) {
-          setMaterialOptions(matJson.data.map((m: any) => ({ materialCode: m.materialCode, description: m.description, unit: m.unit })));
-        }
-      } catch (e) {
-        console.error('Failed to load master data', e);
-      } finally {
-        setLoadingOptions(false);
-      }
-    };
-    loadMasterData();
-  }, []);
 
   // Labor handlers
   const addLaborEntry = () => {
@@ -461,24 +433,15 @@ export default function NewDUPATemplatePage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Description
                         </label>
-                        {loadingOptions ? (
-                          <div className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-500">Loading equipment...</div>
-                        ) : (
-                          <select
-                            value={equip.equipmentId}
-                            onChange={(e) => {
-                              const selected = equipmentOptions.find(o => o._id === e.target.value);
-                              updateEquipmentEntry(index, 'equipmentId', e.target.value);
-                              updateEquipmentEntry(index, 'description', selected ? selected.description : '');
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="">Select equipment</option>
-                            {equipmentOptions.map((opt) => (
-                              <option key={opt._id} value={opt._id}>{opt.description}</option>
-                            ))}
-                          </select>
-                        )}
+                        <input
+                          type="text"
+                          value={equip.description}
+                          onChange={(e) =>
+                            updateEquipmentEntry(index, 'description', e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="Equipment description"
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -517,10 +480,12 @@ export default function NewDUPATemplatePage() {
                       </label>
                       <input
                         type="text"
-                        value={equip.description}
-                        onChange={(e) => updateEquipmentEntry(index, 'description', e.target.value)}
+                        value={equip.equipmentId}
+                        onChange={(e) =>
+                          updateEquipmentEntry(index, 'equipmentId', e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Optional custom description override"
+                        placeholder="Link to equipment database"
                       />
                     </div>
                     <button
@@ -560,25 +525,15 @@ export default function NewDUPATemplatePage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Description
                         </label>
-                        {loadingOptions ? (
-                          <div className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-500">Loading materials...</div>
-                        ) : (
-                          <select
-                            value={material.materialCode}
-                            onChange={(e) => {
-                              const selected = materialOptions.find(o => o.materialCode === e.target.value);
-                              updateMaterialEntry(index, 'materialCode', e.target.value);
-                              updateMaterialEntry(index, 'description', selected ? selected.description : '');
-                              updateMaterialEntry(index, 'unit', selected ? selected.unit : '');
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="">Select material</option>
-                            {materialOptions.map((opt) => (
-                              <option key={opt.materialCode} value={opt.materialCode}>{opt.description} ({opt.materialCode})</option>
-                            ))}
-                          </select>
-                        )}
+                        <input
+                          type="text"
+                          value={material.description}
+                          onChange={(e) =>
+                            updateMaterialEntry(index, 'description', e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="Material description"
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -610,16 +565,16 @@ export default function NewDUPATemplatePage() {
                     </div>
                     <div className="mt-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Description (optional override)
+                        Material Code (optional)
                       </label>
                       <input
                         type="text"
-                        value={material.description}
+                        value={material.materialCode}
                         onChange={(e) =>
-                          updateMaterialEntry(index, 'description', e.target.value)
+                          updateMaterialEntry(index, 'materialCode', e.target.value)
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Custom description if different from selected material"
+                        placeholder="Link to material database"
                       />
                     </div>
                     <button

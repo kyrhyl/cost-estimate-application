@@ -8,19 +8,17 @@ const ProjectSchema = z.object({
   projectLocation: z.string().min(1, 'Project location is required'),
   district: z.string().default('Bukidnon 1st'),
   implementingOffice: z.string().default('DPWH Bukidnon 1st District Engineering Office'),
-  // Appropriation in UI is a text field (e.g., "FY 2025 GAA")
-  appropriation: z.string().optional().default(''),
+  appropriation: z.number().min(0).default(0),
   contractId: z.string().optional(),
   projectType: z.string().optional(),
   status: z
     .enum(['Planning', 'Approved', 'Ongoing', 'Completed', 'Cancelled'])
     .default('Planning'),
-  // Accept simple date strings (YYYY-MM-DD) from <input type="date">
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
   description: z.string().optional(),
-  haulingCostPerKm: z.coerce.number().min(0).default(0),
-  distanceFromOffice: z.coerce.number().min(0).default(0),
+  haulingCostPerKm: z.number().min(0).default(0),
+  distanceFromOffice: z.number().min(0).default(0),
 });
 
 // GET /api/projects - List projects with filtering
