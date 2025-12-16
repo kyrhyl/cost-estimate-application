@@ -158,7 +158,8 @@ export async function POST(
             .lean();
           
           if (price) {
-            unitCost = price.unitPrice;
+            // Align with MaterialPrice schema field name
+            unitCost = price.unitCost ?? 0;
           }
         }
 
