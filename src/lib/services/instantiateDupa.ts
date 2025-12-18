@@ -153,6 +153,22 @@ export async function instantiateDUPA(
     equipmentCost += amount;
   }
   
+  // 5.1. Add Minor Tools if configured in template
+  if (template.includeMinorTools) {
+    const minorToolsAmount = laborCost * (template.minorToolsPercentage / 100);
+    
+    equipmentComputed.push({
+      equipmentId: undefined,
+      description: `Minor Tools (${template.minorToolsPercentage}% of Labor Cost)`,
+      noOfUnits: 1,
+      noOfHours: 1,
+      hourlyRate: minorToolsAmount,
+      amount: minorToolsAmount
+    });
+    
+    equipmentCost += minorToolsAmount;
+  }
+  
   // 6. Compute material costs (base price + hauling cost)
   const materialComputed: IComputedMaterial[] = [];
   let materialCost = 0;

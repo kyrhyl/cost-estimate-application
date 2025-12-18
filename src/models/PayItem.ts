@@ -21,7 +21,7 @@ const PayItemSchema = new Schema<IPayItem>(
   {
     division: {
       type: String,
-      required: true,
+      required: false, // Made optional since some pay items don't have divisions
       trim: true,
       index: true,
     },
@@ -33,7 +33,7 @@ const PayItemSchema = new Schema<IPayItem>(
     },
     item: {
       type: String,
-      required: true,
+      required: false, // Made optional since some pay items don't have items
       trim: true,
       index: true,
     },

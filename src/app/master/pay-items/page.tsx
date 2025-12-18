@@ -38,10 +38,76 @@ export default function PayItemsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [allParts, setAllParts] = useState<string[]>([]);
+  const [allDivisions, setAllDivisions] = useState<string[]>([]);
+  const [allUnits, setAllUnits] = useState<string[]>([]);
+  const [divisionPartMap, setDivisionPartMap] = useState<Record<string, string[]>>({});
+  const [partsWithoutDivision, setPartsWithoutDivision] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchFilterOptions();
+  }, []);
 
   useEffect(() => {
     fetchPayItems();
   }, [searchTerm, divisionFilter, partFilter, unitFilter, activeFilter, currentPage]);
+
+  const fetchFilterOptions = async () => {
+    try {
+      // Fetch all pay items without pagination to get complete filter options
+      const response = await fetch('/api/master/pay-items?limit=10000');
+      const result = await response.json();
+      
+      if (result.success) {
+        const allPayItems = result.data;
+        const parts = [...new Set(allPayItems.map((p: PayItem) => p.part))].filter(p => p).sort();
+        const divisions = [...new Set(allPayItems.map((p: PayItem) => p.division))].filter(d => d).sort();
+        const units = [...new Set(allPayItems.map((p: PayItem) => p.unit))].filter(u => u).sort();
+        
+        // Build division-part mapping
+        const divisionMap: Record<string, string[]> = {};
+        const partsWithoutDiv: string[] = [];
+        
+        // Initialize division map
+        divisions.forEach(div => {
+          divisionMap[div] = [];
+        });
+        
+        // Group parts by division
+        allPayItems.forEach((item: PayItem) => {
+          if (item.division && item.division.trim()) {
+            if (!divisionMap[item.division]) {
+              divisionMap[item.division] = [];
+            }
+            if (!divisionMap[item.division].includes(item.part)) {
+              divisionMap[item.division].push(item.part);
+            }
+          } else {
+            // Part without division
+            if (!partsWithoutDiv.includes(item.part)) {
+              partsWithoutDiv.push(item.part);
+            }
+          }
+        });
+        
+        // Sort parts within each division
+        Object.keys(divisionMap).forEach(div => {
+          divisionMap[div].sort();
+        });
+        partsWithoutDiv.sort();
+        
+        setAllParts(parts);
+        setAllDivisions(divisions);
+        setAllUnits(units);
+        setDivisionPartMap(divisionMap);
+        setPartsWithoutDivision(partsWithoutDiv);
+        
+        console.log('Filter options loaded:', { parts, divisions, units, divisionMap, partsWithoutDiv });
+      }
+    } catch (err) {
+      console.error('Error fetching filter options:', err);
+    }
+  };
 
   const fetchPayItems = async () => {
     try {
@@ -177,9 +243,15 @@ export default function PayItemsPage() {
     });
   };
 
-  const divisions = [...new Set(payItems.map(p => p.division))];
-  const parts = [...new Set(payItems.map(p => p.part))];
-  const units = [...new Set(payItems.map(p => p.unit))];
+  const divisions = allDivisions;
+  
+  // Available parts depend on selected division
+  const availableParts = divisionFilter 
+    ? (divisionPartMap[divisionFilter] || []).concat(partsWithoutDivision).sort()
+    : allParts;
+  
+  const parts = availableParts;
+  const units = allUnits;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -215,6 +287,8 @@ export default function PayItemsPage() {
               value={divisionFilter}
               onChange={(e) => {
                 setDivisionFilter(e.target.value);
+                // Reset part filter when division changes
+                setPartFilter('');
                 setCurrentPage(1);
               }}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"

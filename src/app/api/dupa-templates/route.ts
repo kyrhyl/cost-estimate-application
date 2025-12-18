@@ -33,6 +33,7 @@ const MaterialTemplateSchema = z.object({
 });
 
 const DUPATemplateSchema = z.object({
+  payItemId: z.string().optional(),
   payItemNumber: z.string().min(1, 'Pay item number is required'),
   payItemDescription: z.string().min(1, 'Description is required'),
   unitOfMeasurement: z.string().min(1, 'Unit of measurement is required'),
@@ -43,6 +44,8 @@ const DUPATemplateSchema = z.object({
   ocmPercentage: z.number().min(0).max(100).default(15),
   cpPercentage: z.number().min(0).max(100).default(10),
   vatPercentage: z.number().min(0).max(100).default(12),
+  includeMinorTools: z.boolean().default(false),
+  minorToolsPercentage: z.number().min(0).max(100).default(10),
   category: z.string().optional(),
   specification: z.string().optional(),
   notes: z.string().optional(),

@@ -63,9 +63,9 @@ function parseCSV(content) {
 
 // PayItem Schema
 const PayItemSchema = new mongoose.Schema({
-  division: { type: String, required: true, trim: true, index: true },
+  division: { type: String, required: false, trim: true, index: true },
   part: { type: String, required: true, trim: true, index: true },
-  item: { type: String, required: true, trim: true, index: true },
+  item: { type: String, required: false, trim: true, index: true },
   payItemNumber: { type: String, required: true, unique: true, trim: true, index: true },
   description: { type: String, required: true, trim: true },
   unit: { type: String, required: true, trim: true },
@@ -105,18 +105,61 @@ async function importPayItems() {
       description: record.Description,
       unit: record.Unit,
       isActive: true,
-    })).filter(item => item.payItemNumber && item.description);
+    })).filter(item => {
+      const isValid = item.payItemNumber && item.description;
+      if (!isValid && item.part === 'PART B') {
+        console.log('PART B item filtered out:', item);
+      }
+      return isValid;
+    });
 
     console.log(`📝 Prepared ${payItems.length} valid pay items`);
+    
+    // Log unique parts
+    const parts = [...new Set(payItems.map(item => item.part))].filter(p => p).sort();
+    console.log('📋 Parts found:', parts);
+    
+    // Log PART B items
+    const partBItemsCount = payItems.filter(item => item.part === 'PART B').length;
+    console.log(`📋 PART B items: ${partBItemsCount}`);
+    if (partBItemsCount > 0) {
+      const samplePartB = payItems.find(item => item.part === 'PART B');
+      console.log('Sample PART B:', samplePartB);
+    }
 
-    // Batch insert
+    // Separate PART B items for special handling
+    const partBItems = payItems.filter(item => item.part === 'PART B');
+    const otherItems = payItems.filter(item => item.part !== 'PART B');
+    
+    console.log(`📋 Processing ${partBItems.length} PART B items and ${otherItems.length} other items`);
+    
+    // Insert PART B items first - using individual insertion due to insertMany issue
+    if (partBItems.length > 0) {
+      console.log(`Attempting to insert ${partBItems.length} PART B items individually`);
+      let partBSuccess = 0;
+      let partBFailures = 0;
+      for (const item of partBItems) {
+        try {
+          await PayItem.create(item);
+          partBSuccess++;
+        } catch (e) {
+          console.log(`❌ PART B item ${item.payItemNumber} failed:`, e.message);
+          partBFailures++;
+        }
+      }
+      console.log(`✅ Inserted ${partBSuccess} PART B items individually, ${partBFailures} failed`);
+    } else {
+      console.log('No PART B items to insert');
+    }
+    
+    // Insert other items
     const batchSize = 100;
-    let inserted = 0;
+    let inserted = partBItems.length; // Start with PART B count
     let failed = 0;
     const errors = [];
 
-    for (let i = 0; i < payItems.length; i += batchSize) {
-      const batch = payItems.slice(i, i + batchSize);
+    for (let i = 0; i < otherItems.length; i += batchSize) {
+      const batch = otherItems.slice(i, i + batchSize);
       try {
         await PayItem.insertMany(batch, { ordered: false });
         inserted += batch.length;

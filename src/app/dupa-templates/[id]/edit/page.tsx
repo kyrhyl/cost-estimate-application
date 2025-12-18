@@ -72,6 +72,10 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
   const [cpPercentage, setCpPercentage] = useState(10);
   const [vatPercentage, setVatPercentage] = useState(12);
 
+  // Minor Tools configuration
+  const [includeMinorTools, setIncludeMinorTools] = useState(false);
+  const [minorToolsPercentage, setMinorToolsPercentage] = useState(10);
+
   // Template items
   const [laborItems, setLaborItems] = useState<LaborTemplate[]>([]);
   const [equipmentItems, setEquipmentItems] = useState<EquipmentTemplate[]>([]);
@@ -99,6 +103,8 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
         setOcmPercentage(template.ocmPercentage);
         setCpPercentage(template.cpPercentage);
         setVatPercentage(template.vatPercentage);
+        setIncludeMinorTools(template.includeMinorTools || false);
+        setMinorToolsPercentage(template.minorToolsPercentage || 10);
         setLaborItems(template.laborTemplate || []);
         setEquipmentItems(template.equipmentTemplate || []);
         setMaterialItems(template.materialTemplate || []);
@@ -237,6 +243,8 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
       ocmPercentage,
       cpPercentage,
       vatPercentage,
+      includeMinorTools,
+      minorToolsPercentage,
       laborTemplate: laborItems,
       equipmentTemplate: equipmentItems,
       materialTemplate: materialItems,
@@ -713,6 +721,45 @@ export default function EditDUPATemplatePage({ params }: { params: { id: string 
               </table>
             </div>
           )}
+        </div>
+
+        {/* Minor Tools Configuration */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Minor Tools Configuration</h2>
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="includeMinorTools"
+                checked={includeMinorTools}
+                onChange={(e) => setIncludeMinorTools(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <label htmlFor="includeMinorTools" className="ml-2 text-sm font-medium text-gray-700">
+                Include Minor Tools (calculated as percentage of Labor Cost)
+              </label>
+            </div>
+            
+            {includeMinorTools && (
+              <div className="ml-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Minor Tools Percentage (%)
+                </label>
+                <input
+                  type="number"
+                  value={minorToolsPercentage}
+                  onChange={(e) => setMinorToolsPercentage(Number(e.target.value))}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Standard DPWH rate is 10% of labor cost
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Action Buttons */}

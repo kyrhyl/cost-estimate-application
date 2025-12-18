@@ -53,6 +53,7 @@ const materialTemplateSchema = new Schema<IMaterialTemplate>({
 // DUPA Template - Reusable template without location-specific rates
 // =============================================
 export interface IDUPATemplate extends Document {
+  payItemId?: mongoose.Types.ObjectId;    // Reference to PayItem collection (optional)
   payItemNumber: string;
   payItemDescription: string;
   unitOfMeasurement: string;
@@ -68,6 +69,10 @@ export interface IDUPATemplate extends Document {
   cpPercentage: number;
   vatPercentage: number;
   
+  // Minor Tools configuration
+  includeMinorTools: boolean;
+  minorToolsPercentage: number;
+  
   // Template metadata
   category?: string;
   specification?: string;
@@ -80,6 +85,11 @@ export interface IDUPATemplate extends Document {
 
 const dupaTemplateSchema = new Schema<IDUPATemplate>(
   {
+    payItemId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PayItem',
+      required: false
+    },
     payItemNumber: {
       type: String,
       required: true,
@@ -120,6 +130,14 @@ const dupaTemplateSchema = new Schema<IDUPATemplate>(
     vatPercentage: {
       type: Number,
       default: 12
+    },
+    includeMinorTools: {
+      type: Boolean,
+      default: false
+    },
+    minorToolsPercentage: {
+      type: Number,
+      default: 10
     },
     category: {
       type: String,
