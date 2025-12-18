@@ -11,7 +11,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:integration": "vitest run src/app/api/master/__tests__/",
-    "test:integration:watch": "vitest watch src/app/api/master/__tests__/"
+    "test:integration:watch": "vitest watch src/app/api/master/__tests__/",
+    "seed:pay-items": "node scripts/import-pay-items.mjs"
   },
   "dependencies": {
     "mongoose": "^8.0.0",

@@ -40,7 +40,8 @@ export default function Header() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive('/master/labor') ||
                   isActive('/master/equipment') ||
-                  isActive('/master/materials')
+                  isActive('/master/materials') ||
+                  isActive('/master/pay-items')
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
@@ -66,11 +67,19 @@ export default function Header() {
                 </Link>
                 <Link
                   href="/master/materials"
-                  className={`block px-4 py-3 text-sm hover:bg-gray-50 last:rounded-b-lg ${
+                  className={`block px-4 py-3 text-sm hover:bg-gray-50 ${
                     isActive('/master/materials') ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
                   }`}
                 >
                   Materials
+                </Link>
+                <Link
+                  href="/master/pay-items"
+                  className={`block px-4 py-3 text-sm hover:bg-gray-50 last:rounded-b-lg ${
+                    isActive('/master/pay-items') ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                  }`}
+                >
+                  Pay Items
                 </Link>
               </div>
             </div>
