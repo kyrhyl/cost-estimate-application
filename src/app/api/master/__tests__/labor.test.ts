@@ -1,11 +1,16 @@
 /**
- * Integration Tests for Labor Rates API
- * Tests all CRUD operations, validation, and error handling
+ * Unit Tests for Labor Rates API
+ * Tests all CRUD operations, validation, and error handling using mocked handlers
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { GET as laborGET, POST as laborPOST } from '../labor/route';
+import { GET as laborByIdGET, PATCH as laborPATCH, DELETE as laborDELETE } from '../labor/[id]/route';
+import LaborRate from '@/models/LaborRate';
+import { testGET, testPOST, testPATCH, testDELETE } from '@/test/helpers/api-test-helper';
 
-const API_BASE = 'http://localhost:3000/api/master/labor';
+// Mock the LaborRate model
+vi.mock('@/models/LaborRate');
 
 // Test data
 const testLaborRate = {
@@ -22,72 +27,60 @@ const testLaborRate = {
   laborUnskilled: 250,
 };
 
-let createdId: string;
+const mockLaborDoc = {
+  _id: 'mock-labor-id-1',
+  ...testLaborRate,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 describe('Labor Rates API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('POST /api/master/labor', () => {
     it('should create a new labor rate', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testLaborRate),
-      });
-
-      const data = await response.json();
+      vi.mocked(LaborRate.findOne).mockResolvedValue(null);
+      vi.mocked(LaborRate.create).mockResolvedValue(mockLaborDoc as any);
+      
+      const response = await testPOST(laborPOST, '/api/master/labor', testLaborRate);
       
       expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data).toBeDefined();
-      expect(data.data.location).toBe(testLaborRate.location);
-      expect(data.data.foreman).toBe(testLaborRate.foreman);
-      
-      createdId = data.data._id;
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toBeDefined();
+      expect(response.data.data.location).toBe(testLaborRate.location);
+      expect(response.data.data.foreman).toBe(testLaborRate.foreman);
     });
 
     it('should reject duplicate location', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testLaborRate),
-      });
-
-      const data = await response.json();
+      vi.mocked(LaborRate.findOne).mockResolvedValue(mockLaborDoc as any);
+      
+      const response = await testPOST(laborPOST, '/api/master/labor', testLaborRate);
       
       expect(response.status).toBe(409);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('already exists');
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toContain('already exists');
     });
 
     it('should reject invalid data (negative rates)', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...testLaborRate,
-          location: 'Invalid City',
-          foreman: -100,
-        }),
+      const response = await testPOST(laborPOST, '/api/master/labor', {
+        ...testLaborRate,
+        location: 'Invalid City',
+        foreman: -100,
       });
-
-      const data = await response.json();
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should reject missing required fields', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'Incomplete City',
-        }),
+      const response = await testPOST(laborPOST, '/api/master/labor', {
+        location: 'Incomplete City',
       });
-
-      const data = await response.json();
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should support bulk import', async () => {
@@ -96,90 +89,138 @@ describe('Labor Rates API', () => {
         { ...testLaborRate, location: 'Bulk City 2' },
       ];
 
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bulkData),
-      });
-
-      const data = await response.json();
+      // Mock find to return empty (no duplicates) with select chain
+      const mockFindResult = {
+        select: vi.fn().mockResolvedValue([])
+      };
+      vi.mocked(LaborRate.find).mockReturnValue(mockFindResult as any);
+      
+      vi.mocked(LaborRate.insertMany).mockResolvedValue(bulkData.map((rate, idx) => ({
+        _id: `mock-labor-id-${idx + 2}`,
+        ...rate,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })) as any);
+      
+      const response = await testPOST(laborPOST, '/api/master/labor', bulkData);
       
       expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.count).toBe(2);
-      expect(data.data).toHaveLength(2);
+      expect(response.data.success).toBe(true);
+      expect(response.data.count).toBe(2);
+      expect(response.data.data).toHaveLength(2);
     });
   });
 
   describe('GET /api/master/labor', () => {
+    const mockLaborRates = [
+      { ...mockLaborDoc, _id: 'id-1', location: 'Test City' },
+      { ...mockLaborDoc, _id: 'id-2', location: 'Bulk City 1' },
+    ];
+
     it('should list all labor rates', async () => {
-      const response = await fetch(API_BASE);
-      const data = await response.json();
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(mockLaborRates),
+      };
+      vi.mocked(LaborRate.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(laborGET, '/api/master/labor');
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data).toBeDefined();
-      expect(Array.isArray(data.data)).toBe(true);
-      expect(data.count).toBeGreaterThan(0);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toBeDefined();
+      expect(Array.isArray(response.data.data)).toBe(true);
+      expect(response.data.count).toBeGreaterThan(0);
     });
 
     it('should filter by location', async () => {
-      const response = await fetch(`${API_BASE}?location=Test`);
-      const data = await response.json();
+      const filtered = mockLaborRates.filter(r => r.location.includes('Test'));
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(filtered),
+      };
+      vi.mocked(LaborRate.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(laborGET, '/api/master/labor', { location: 'Test' });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.every((rate: any) => rate.location.includes('Test'))).toBe(true);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.every((rate: any) => rate.location.includes('Test'))).toBe(true);
     });
 
     it('should filter by district', async () => {
-      const response = await fetch(`${API_BASE}?district=Test District`);
-      const data = await response.json();
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(mockLaborRates),
+      };
+      vi.mocked(LaborRate.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(laborGET, '/api/master/labor', { district: 'Test District' });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.every((rate: any) => rate.district === 'Test District')).toBe(true);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.every((rate: any) => rate.district === 'Test District')).toBe(true);
     });
 
     it('should sort results', async () => {
-      const response = await fetch(`${API_BASE}?sortBy=location&order=asc`);
-      const data = await response.json();
+      const sorted = [...mockLaborRates].sort((a, b) => a.location.localeCompare(b.location));
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(sorted),
+      };
+      vi.mocked(LaborRate.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(laborGET, '/api/master/labor', { sortBy: 'location', order: 'asc' });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
+      expect(response.data.success).toBe(true);
       
-      const locations = data.data.map((rate: any) => rate.location);
-      const sorted = [...locations].sort();
-      expect(locations).toEqual(sorted);
+      const locations = response.data.data.map((rate: any) => rate.location);
+      const expectedSorted = [...locations].sort();
+      expect(locations).toEqual(expectedSorted);
     });
   });
 
   describe('GET /api/master/labor/:id', () => {
     it('should get a specific labor rate', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`);
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(mockLaborDoc),
+      };
+      vi.mocked(LaborRate.findById).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(laborByIdGET, '/api/master/labor/mock-labor-id-1');
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data._id).toBe(createdId);
-      expect(data.data.location).toBe(testLaborRate.location);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data._id).toBe('mock-labor-id-1');
+      expect(response.data.data.location).toBe(testLaborRate.location);
     });
 
     it('should return 404 for non-existent ID', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await fetch(`${API_BASE}/${fakeId}`);
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(null),
+      };
+      vi.mocked(LaborRate.findById).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(laborByIdGET, '/api/master/labor/507f1f77bcf86cd799439011');
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should return 400 for invalid ID format', async () => {
-      const response = await fetch(`${API_BASE}/invalid-id`);
-      const data = await response.json();
+      const castError = new Error('Cast to ObjectId failed');
+      (castError as any).name = 'CastError';
+      
+      const mockFind = {
+        lean: vi.fn().mockRejectedValue(castError)
+      };
+      vi.mocked(LaborRate.findById).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(laborByIdGET, '/api/master/labor/invalid-id');
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
   });
 
@@ -190,105 +231,93 @@ describe('Labor Rates API', () => {
         leadman: 500,
       };
 
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-
-      const data = await response.json();
+      vi.mocked(LaborRate.findOne).mockResolvedValue(null);
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue({
+          ...mockLaborDoc,
+          foreman: 550,
+          leadman: 500,
+        }),
+      };
+      vi.mocked(LaborRate.findByIdAndUpdate).mockReturnValue(mockFind as any);
+      
+      const response = await testPATCH(laborPATCH, '/api/master/labor/mock-labor-id-1', updates, { id: 'mock-labor-id-1' });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.foreman).toBe(550);
-      expect(data.data.leadman).toBe(500);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.foreman).toBe(550);
+      expect(response.data.data.leadman).toBe(500);
     });
 
     it('should reject negative rates', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ foreman: -100 }),
-      });
-
-      const data = await response.json();
+      const response = await testPATCH(laborPATCH, '/api/master/labor/mock-labor-id-1', { foreman: -100 }, { id: 'mock-labor-id-1' });
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should reject duplicate location on update', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location: 'Bulk City 1' }),
-      });
-
-      const data = await response.json();
+      vi.mocked(LaborRate.findOne).mockResolvedValue({
+        _id: 'different-id',
+        location: 'Bulk City 1',
+      } as any);
+      
+      const response = await testPATCH(laborPATCH, '/api/master/labor/mock-labor-id-1', { location: 'Bulk City 1' }, { id: 'mock-labor-id-1' });
       
       expect(response.status).toBe(409);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should return 404 for non-existent ID', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await fetch(`${API_BASE}/${fakeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ foreman: 600 }),
-      });
-
-      const data = await response.json();
+      vi.mocked(LaborRate.findOne).mockResolvedValue(null);
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(null),
+      };
+      vi.mocked(LaborRate.findByIdAndUpdate).mockReturnValue(mockFind as any);
+      
+      const response = await testPATCH(laborPATCH, '/api/master/labor/507f1f77bcf86cd799439011', { foreman: 600 }, { id: '507f1f77bcf86cd799439011' });
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
   });
 
   describe('DELETE /api/master/labor/:id', () => {
     it('should delete a labor rate', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(mockLaborDoc),
+      };
+      vi.mocked(LaborRate.findByIdAndDelete).mockReturnValue(mockFind as any);
+      
+      const response = await testDELETE(laborDELETE, '/api/master/labor/mock-labor-id-1', { id: 'mock-labor-id-1' });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data._id).toBe(createdId);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data._id).toBe('mock-labor-id-1');
     });
 
     it('should return 404 after deletion', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`);
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(null),
+      };
+      vi.mocked(LaborRate.findByIdAndDelete).mockReturnValue(mockFind as any);
+      
+      const response = await testDELETE(laborDELETE, '/api/master/labor/mock-labor-id-1', { id: 'mock-labor-id-1' });
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should return 404 for non-existent ID', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await fetch(`${API_BASE}/${fakeId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(null),
+      };
+      vi.mocked(LaborRate.findByIdAndDelete).mockReturnValue(mockFind as any);
+      
+      const response = await testDELETE(laborDELETE, '/api/master/labor/507f1f77bcf86cd799439011', { id: '507f1f77bcf86cd799439011' });
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
-  });
-
-  // Cleanup
-  afterAll(async () => {
-    // Delete bulk test data
-    const response = await fetch(API_BASE);
-    const data = await response.json();
-    
-    for (const rate of data.data) {
-      if (rate.location.startsWith('Bulk City')) {
-        await fetch(`${API_BASE}/${rate._id}`, { method: 'DELETE' });
-      }
-    }
   });
 });

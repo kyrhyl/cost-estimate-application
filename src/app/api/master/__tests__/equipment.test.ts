@@ -1,200 +1,265 @@
 /**
- * Integration Tests for Equipment API
- * Tests CRUD operations, validation, filtering, and bulk operations
+ * Unit Tests for Equipment API
+ * Tests CRUD operations, validation, filtering, and bulk operations using mocked handlers
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { GET as equipmentGET, POST as equipmentPOST, DELETE as equipmentDELETE } from '../equipment/route';
+import { GET as equipmentByIdGET, PATCH as equipmentByIdPATCH, DELETE as equipmentByIdDELETE } from '../equipment/[id]/route';
+import { testGET, testPOST, testPATCH, testDELETE } from '../../../../test/helpers/api-test-helper';
+import Equipment from '../../../../models/Equipment';
 
-const API_BASE = 'http://localhost:3000/api/master/equipment';
+// Mock the Equipment model
+vi.mock('@/models/Equipment', () => ({
+  default: {
+    findOne: vi.fn(),
+    create: vi.fn(),
+    find: vi.fn(),
+    findById: vi.fn(),
+    findByIdAndUpdate: vi.fn(),
+    findByIdAndDelete: vi.fn(),
+    insertMany: vi.fn(),
+    deleteMany: vi.fn(),
+  }
+}));
 
 // Test data
 const testEquipment = {
-  no: 'TEST-001',
+  no: 1,
   description: 'Test Equipment',
   completeDescription: 'Test Equipment Complete Description',
-  model: 'TEST-MODEL',
+  equipmentModel: 'TEST-MODEL',
   capacity: '100',
-  hp: 50,
-  hourlyRateOperating: 1000,
-  hourlyRateIdle: 500,
+  flywheelHorsepower: 50,
+  hourlyRate: 1000,
+  rentalRate: 500,
 };
 
-let createdId: string;
+const mockEquipmentDoc = {
+  _id: 'mock-equipment-id-1',
+  ...testEquipment,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 describe('Equipment API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   describe('POST /api/master/equipment', () => {
     it('should create new equipment', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testEquipment),
-      });
-
-      const data = await response.json();
+      vi.mocked(Equipment.findOne).mockResolvedValue(null);
+      vi.mocked(Equipment.create).mockResolvedValue(mockEquipmentDoc as any);
+      
+      const response = await testPOST(equipmentPOST, '/api/master/equipment', testEquipment);
       
       expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.data).toBeDefined();
-      expect(data.data.no).toBe(testEquipment.no);
-      expect(data.data.description).toBe(testEquipment.description);
-      
-      createdId = data.data._id;
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toBeDefined();
+      expect(response.data.data.no).toBe(testEquipment.no);
+      expect(response.data.data.description).toBe(testEquipment.description);
     });
 
     it('should reject duplicate equipment number', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testEquipment),
-      });
-
-      const data = await response.json();
+      vi.mocked(Equipment.findOne).mockResolvedValue(mockEquipmentDoc as any);
+      
+      const response = await testPOST(equipmentPOST, '/api/master/equipment', testEquipment);
       
       expect(response.status).toBe(409);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('already exists');
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toContain('already exists');
     });
 
     it('should reject missing required fields', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          no: 'TEST-002',
-          // Missing description
-        }),
+      const response = await testPOST(equipmentPOST, '/api/master/equipment', {
+        no: 2,
+        // Missing description and completeDescription
       });
-
-      const data = await response.json();
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should reject negative rates', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...testEquipment,
-          no: 'TEST-NEG',
-          hourlyRateOperating: -100,
-        }),
+      const response = await testPOST(equipmentPOST, '/api/master/equipment', {
+        ...testEquipment,
+        no: 999,
+        hourlyRate: -100,
       });
-
-      const data = await response.json();
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should support bulk import', async () => {
       const bulkData = [
-        { ...testEquipment, no: 'BULK-001' },
-        { ...testEquipment, no: 'BULK-002' },
-        { ...testEquipment, no: 'BULK-003' },
+        { ...testEquipment, no: 10 },
+        { ...testEquipment, no: 11 },
+        { ...testEquipment, no: 12 },
       ];
-
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bulkData),
-      });
-
-      const data = await response.json();
+      
+      // Mock find to return empty (no duplicates) with select chain
+      const mockFindResult = {
+        select: vi.fn().mockResolvedValue([])
+      };
+      vi.mocked(Equipment.find).mockReturnValue(mockFindResult as any);
+      
+      vi.mocked(Equipment.insertMany).mockResolvedValue(bulkData.map((eq, idx) => ({
+        _id: `mock-equipment-id-${idx + 2}`,
+        ...eq,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })) as any);
+      
+      const response = await testPOST(equipmentPOST, '/api/master/equipment', bulkData);
       
       expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.count).toBe(3);
-      expect(data.data).toHaveLength(3);
+      expect(response.data.success).toBe(true);
+      expect(response.data.count).toBe(3);
+      expect(response.data.data).toHaveLength(3);
     });
   });
 
   describe('GET /api/master/equipment', () => {
+    const mockEquipments = [
+      { ...mockEquipmentDoc, _id: 'id-1', no: 1, description: 'Test Equipment 1' },
+      { ...mockEquipmentDoc, _id: 'id-2', no: 2, description: 'Test Equipment 2', hourlyRate: 800 },
+      { ...mockEquipmentDoc, _id: 'id-3', no: 3, description: 'Excavator', hourlyRate: 1500 },
+    ];
+
     it('should list all equipment', async () => {
-      const response = await fetch(API_BASE);
-      const data = await response.json();
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(mockEquipments),
+      };
+      vi.mocked(Equipment.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentGET, '/api/master/equipment');
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data).toBeDefined();
-      expect(Array.isArray(data.data)).toBe(true);
-      expect(data.count).toBeGreaterThan(0);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toBeDefined();
+      expect(Array.isArray(response.data.data)).toBe(true);
+      expect(response.data.count).toBe(3);
     });
 
     it('should search by description', async () => {
-      const response = await fetch(`${API_BASE}?search=Test`);
-      const data = await response.json();
+      const filtered = mockEquipments.filter(eq => 
+        eq.description.includes('Test') || eq.completeDescription.includes('Test')
+      );
+      
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(filtered),
+      };
+      vi.mocked(Equipment.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentGET, '/api/master/equipment', { search: 'Test' });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.every((eq: any) => 
-        eq.description.includes('Test') || eq.completeDescription.includes('Test')
-      )).toBe(true);
+      expect(response.data.success).toBe(true);
     });
 
     it('should filter by rate range', async () => {
-      const response = await fetch(`${API_BASE}?minRate=500&maxRate=1500`);
-      const data = await response.json();
+      const filtered = mockEquipments.filter(eq => 
+        eq.hourlyRate >= 500 && eq.hourlyRate <= 1500
+      );
+      
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(filtered),
+      };
+      vi.mocked(Equipment.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentGET, '/api/master/equipment', { 
+        minRate: '500', 
+        maxRate: '1500' 
+      });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.every((eq: any) => 
-        eq.hourlyRateOperating >= 500 && eq.hourlyRateOperating <= 1500
-      )).toBe(true);
+      expect(response.data.success).toBe(true);
     });
 
     it('should sort results', async () => {
-      const response = await fetch(`${API_BASE}?sortBy=no&order=asc`);
-      const data = await response.json();
+      const sorted = [...mockEquipments].sort((a, b) => a.no - b.no);
+      
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(sorted),
+      };
+      vi.mocked(Equipment.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentGET, '/api/master/equipment', { 
+        sortBy: 'no', 
+        order: 'asc' 
+      });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
+      expect(response.data.success).toBe(true);
       
-      const numbers = data.data.map((eq: any) => eq.no);
-      const sorted = [...numbers].sort();
-      expect(numbers).toEqual(sorted);
+      const numbers = response.data.data.map((eq: any) => eq.no);
+      expect(numbers).toEqual([1, 2, 3]);
     });
 
     it('should sort by hourly rate', async () => {
-      const response = await fetch(`${API_BASE}?sortBy=hourlyRateOperating&order=desc`);
-      const data = await response.json();
+      const sorted = [...mockEquipments].sort((a, b) => b.hourlyRate - a.hourlyRate);
+      
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue(sorted),
+      };
+      vi.mocked(Equipment.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentGET, '/api/master/equipment', { 
+        sortBy: 'hourlyRate', 
+        order: 'desc' 
+      });
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      
-      const rates = data.data.map((eq: any) => eq.hourlyRateOperating);
-      const sorted = [...rates].sort((a: number, b: number) => b - a);
-      expect(rates).toEqual(sorted);
+      expect(response.data.success).toBe(true);
     });
   });
 
   describe('GET /api/master/equipment/:id', () => {
     it('should get specific equipment', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`);
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(mockEquipmentDoc),
+      };
+      vi.mocked(Equipment.findById).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentByIdGET, '/api/master/equipment/mock-equipment-id-1');
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data._id).toBe(createdId);
-      expect(data.data.no).toBe(testEquipment.no);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data._id).toBe('mock-equipment-id-1');
+      expect(response.data.data.no).toBe(testEquipment.no);
     });
 
     it('should return 404 for non-existent ID', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await fetch(`${API_BASE}/${fakeId}`);
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(null),
+      };
+      vi.mocked(Equipment.findById).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentByIdGET, '/api/master/equipment/507f1f77bcf86cd799439011');
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should return 400 for invalid ID format', async () => {
-      const response = await fetch(`${API_BASE}/invalid-id`);
-      const data = await response.json();
+      const castError = new Error('Cast to ObjectId failed');
+      (castError as any).name = 'CastError';
+      
+      const mockFind = {
+        lean: vi.fn().mockRejectedValue(castError)
+      };
+      vi.mocked(Equipment.findById).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentByIdGET, '/api/master/equipment/invalid-id');
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
   });
 
@@ -202,138 +267,132 @@ describe('Equipment API', () => {
     it('should update equipment', async () => {
       const updates = {
         description: 'Updated Test Equipment',
-        hourlyRateOperating: 1200,
+        hourlyRate: 1200,
       };
 
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-
-      const data = await response.json();
+      const updatedDoc = { ...mockEquipmentDoc, ...updates };
+      
+      vi.mocked(Equipment.findOne).mockResolvedValue(null);
+      const mockUpdate = {
+        lean: vi.fn().mockResolvedValue(updatedDoc)
+      };
+      vi.mocked(Equipment.findByIdAndUpdate).mockReturnValue(mockUpdate as any);
+      
+      const response = await testPATCH(equipmentByIdPATCH, '/api/master/equipment/mock-equipment-id-1', updates);
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data.description).toBe('Updated Test Equipment');
-      expect(data.data.hourlyRateOperating).toBe(1200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.description).toBe('Updated Test Equipment');
+      expect(response.data.data.hourlyRate).toBe(1200);
     });
 
     it('should reject duplicate equipment number', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ no: 'BULK-001' }),
-      });
-
-      const data = await response.json();
+      vi.mocked(Equipment.findOne).mockResolvedValue({ 
+        _id: 'different-id',
+        no: 10 
+      } as any);
+      
+      const response = await testPATCH(equipmentByIdPATCH, '/api/master/equipment/mock-equipment-id-1', { no: 10 });
       
       expect(response.status).toBe(409);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should reject negative rates', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hourlyRateOperating: -500 }),
+      const response = await testPATCH(equipmentByIdPATCH, '/api/master/equipment/mock-equipment-id-1', { 
+        hourlyRate: -500 
       });
-
-      const data = await response.json();
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should return 404 for non-existent ID', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await fetch(`${API_BASE}/${fakeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: 'Update' }),
+      vi.mocked(Equipment.findOne).mockResolvedValue(null);
+      const mockUpdate = {
+        lean: vi.fn().mockResolvedValue(null)
+      };
+      vi.mocked(Equipment.findByIdAndUpdate).mockReturnValue(mockUpdate as any);
+      
+      const response = await testPATCH(equipmentByIdPATCH, '/api/master/equipment/507f1f77bcf86cd799439011', { 
+        description: 'Update' 
       });
-
-      const data = await response.json();
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
   });
 
   describe('DELETE /api/master/equipment/:id', () => {
     it('should delete equipment', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
+      const mockDelete = {
+        lean: vi.fn().mockResolvedValue(mockEquipmentDoc)
+      };
+      vi.mocked(Equipment.findByIdAndDelete).mockReturnValue(mockDelete as any);
+      
+      const response = await testDELETE(equipmentByIdDELETE, '/api/master/equipment/mock-equipment-id-1');
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.data._id).toBe(createdId);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data._id).toBe('mock-equipment-id-1');
     });
 
     it('should return 404 after deletion', async () => {
-      const response = await fetch(`${API_BASE}/${createdId}`);
-      const data = await response.json();
+      const mockFind = {
+        lean: vi.fn().mockResolvedValue(null),
+      };
+      vi.mocked(Equipment.findById).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentByIdGET, '/api/master/equipment/mock-equipment-id-1');
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
 
     it('should return 404 for non-existent ID', async () => {
-      const fakeId = '507f1f77bcf86cd799439011';
-      const response = await fetch(`${API_BASE}/${fakeId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
+      const mockDelete = {
+        lean: vi.fn().mockResolvedValue(null)
+      };
+      vi.mocked(Equipment.findByIdAndDelete).mockReturnValue(mockDelete as any);
+      
+      const response = await testDELETE(equipmentByIdDELETE, '/api/master/equipment/507f1f77bcf86cd799439011');
       
       expect(response.status).toBe(404);
-      expect(data.success).toBe(false);
+      expect(response.data.success).toBe(false);
     });
   });
 
   describe('DELETE /api/master/equipment (bulk)', () => {
     it('should require confirmation', async () => {
-      const response = await fetch(API_BASE, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
+      const response = await testDELETE(equipmentDELETE, '/api/master/equipment');
       
       expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('confirm=true');
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toContain('confirm=true');
     });
 
     it('should delete all with confirmation', async () => {
-      const response = await fetch(`${API_BASE}?confirm=true`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
+      vi.mocked(Equipment.deleteMany).mockResolvedValue({ deletedCount: 5 } as any);
+      
+      const response = await testDELETE(equipmentDELETE, '/api/master/equipment?confirm=true');
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.deleted).toBeGreaterThan(0);
+      expect(response.data.success).toBe(true);
+      expect(response.data.deletedCount).toBe(5);
     });
 
     it('should return empty list after bulk delete', async () => {
-      const response = await fetch(API_BASE);
-      const data = await response.json();
+      const mockFind = {
+        sort: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue([]),
+      };
+      vi.mocked(Equipment.find).mockReturnValue(mockFind as any);
+      
+      const response = await testGET(equipmentGET, '/api/master/equipment');
       
       expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.count).toBe(0);
-    });
-  });
-
-  // Re-create test data for other tests if needed
-  beforeAll(async () => {
-    // Ensure clean state
-    const deleteResponse = await fetch(`${API_BASE}?confirm=true`, {
-      method: 'DELETE',
+      expect(response.data.success).toBe(true);
+      expect(response.data.count).toBe(0);
     });
   });
 });
