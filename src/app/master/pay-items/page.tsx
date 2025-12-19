@@ -60,9 +60,9 @@ export default function PayItemsPage() {
       
       if (result.success) {
         const allPayItems = result.data;
-        const parts = [...new Set(allPayItems.map((p: PayItem) => p.part))].filter(p => p).sort();
-        const divisions = [...new Set(allPayItems.map((p: PayItem) => p.division))].filter(d => d).sort();
-        const units = [...new Set(allPayItems.map((p: PayItem) => p.unit))].filter(u => u).sort();
+        const parts = [...new Set(allPayItems.map((p: PayItem) => p.part))].filter((p): p is string => !!p).sort();
+        const divisions = [...new Set(allPayItems.map((p: PayItem) => p.division))].filter((d): d is string => !!d).sort();
+        const units = [...new Set(allPayItems.map((p: PayItem) => p.unit))].filter((u): u is string => !!u).sort();
         
         // Build division-part mapping
         const divisionMap: Record<string, string[]> = {};

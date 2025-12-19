@@ -492,44 +492,44 @@ export default function EquipmentPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Capacity</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rental Rate</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hourly Rate</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="w-16 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
+                  <th className="w-64 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                  <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
+                  <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Capacity</th>
+                  <th className="w-32 px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rental Rate</th>
+                  <th className="w-32 px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hourly Rate</th>
+                  <th className="w-40 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {equipment.map((eq) => (
                   <tr key={eq._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-3 py-3 text-sm font-medium text-gray-900">
                       {eq.no}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{eq.description}</div>
-                      <div className="text-xs text-gray-500">{eq.completeDescription}</div>
+                    <td className="px-3 py-3">
+                      <div className="text-sm font-medium text-gray-900 truncate">{eq.description}</div>
+                      <div className="text-xs text-gray-500 truncate">{eq.completeDescription}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-3 text-sm text-gray-500 truncate">
                       {eq.equipmentModel || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-3 text-sm text-gray-500 truncate">
                       {eq.capacity || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                    <td className="px-3 py-3 text-right text-sm text-gray-900 whitespace-nowrap">
                       ₱{eq.rentalRate.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                    <td className="px-3 py-3 text-right text-sm text-gray-900 whitespace-nowrap">
                       ₱{eq.hourlyRate.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <td className="px-3 py-3 text-center text-sm font-medium">
                       <button
                         onClick={() => handleEdit(eq)}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        className="text-blue-600 hover:text-blue-900 mr-3"
                       >
                         Edit
                       </button>

@@ -246,28 +246,28 @@ export default function DUPATemplatesPage() {
             {/* Templates Table */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="w-full table-fixed divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Pay Item
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-64 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Description
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-28 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Unit
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Category
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Entries
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-24 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-64 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Actions
                       </th>
                     </tr>
@@ -275,38 +275,38 @@ export default function DUPATemplatesPage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {templates.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                        <td colSpan={7} className="px-3 py-12 text-center text-gray-500">
                           No templates found. Create your first template to get started.
                         </td>
                       </tr>
                     ) : (
                       templates.map((template) => (
                         <tr key={template._id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-medium text-gray-900">
+                          <td className="px-3 py-3">
+                            <div className="font-medium text-gray-900 text-sm">
                               {template.payItemNumber}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900 max-w-xs truncate">
+                          <td className="px-3 py-3">
+                            <div className="text-sm text-gray-900 truncate">
                               {template.payItemDescription}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-3 py-3 text-sm text-gray-500">
                             {template.unitOfMeasurement}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-3 py-3 text-sm text-gray-500 truncate">
                             {template.category || '-'}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-3 py-3 text-sm text-gray-500 whitespace-nowrap">
                             L: {template.laborTemplate.length} | 
                             E: {template.equipmentTemplate.length} | 
                             M: {template.materialTemplate.length}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 py-3">
                             <button
                               onClick={() => toggleActive(template)}
-                              className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${
                                 template.isActive
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-gray-100 text-gray-800'
@@ -315,31 +315,33 @@ export default function DUPATemplatesPage() {
                               {template.isActive ? 'Active' : 'Inactive'}
                             </button>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                            <Link
-                              href={`/dupa-templates/${template._id}`}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              View
-                            </Link>
-                            <Link
-                              href={`/dupa-templates/${template._id}/edit`}
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              Edit
-                            </Link>
-                            <button
-                              onClick={() => openInstantiateModal(template)}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              Instantiate
-                            </button>
-                            <button
-                              onClick={() => handleDelete(template)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Delete
-                            </button>
+                          <td className="px-3 py-3 text-sm font-medium">
+                            <div className="flex flex-wrap gap-2">
+                              <Link
+                                href={`/dupa-templates/${template._id}`}
+                                className="text-blue-600 hover:text-blue-900"
+                              >
+                                View
+                              </Link>
+                              <Link
+                                href={`/dupa-templates/${template._id}/edit`}
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                Edit
+                              </Link>
+                              <button
+                                onClick={() => openInstantiateModal(template)}
+                                className="text-green-600 hover:text-green-900"
+                              >
+                                Instantiate
+                              </button>
+                              <button
+                                onClick={() => handleDelete(template)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
