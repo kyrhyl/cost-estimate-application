@@ -21,8 +21,7 @@ const LaborRateSchema = new Schema<ILaborRate>(
   {
     location: {
       type: String,
-      required: true,
-      unique: true
+      required: true
     },
     district: {
       type: String,

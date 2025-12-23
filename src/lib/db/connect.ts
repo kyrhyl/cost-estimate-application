@@ -1,4 +1,11 @@
+import dotenv from 'dotenv';
+import { join } from 'path';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../../../.env.local') });
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 

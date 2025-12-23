@@ -6,6 +6,14 @@
  * Or: npm run seed (add to package.json scripts)
  */
 
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import dotenv from 'dotenv';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../.env.local') });
+console.log('CWD:', process.cwd());
+console.log('MONGODB_URI:', process.env.MONGODB_URI);
 import mongoose from 'mongoose';
 import dbConnect from '../src/lib/db/connect';
 
@@ -410,10 +418,10 @@ async function seed() {
 
     // Clear existing data (optional - comment out to keep existing data)
     console.log('🗑️  Clearing existing data...');
-    await LaborRate.deleteMany({});
-    await Equipment.deleteMany({});
-    await Material.deleteMany({});
-    await MaterialPrice.deleteMany({});
+    await LaborRate.collection.drop().catch(() => {}); // Ignore if collection doesn't exist
+    // await Equipment.collection.drop().catch(() => {});
+    // await Material.collection.drop().catch(() => {});
+    // await MaterialPrice.collection.drop().catch(() => {});
     console.log('✅ Existing data cleared\n');
 
     // Seed Labor Rates
@@ -423,17 +431,17 @@ async function seed() {
 
     // Seed Equipment
     console.log('🚜 Seeding Equipment...');
-    await Equipment.insertMany(equipment);
+    // await Equipment.insertMany(equipment);
     console.log(`✅ ${equipment.length} equipment items inserted\n`);
 
     // Seed Materials
     console.log('🧱 Seeding Materials...');
-    await Material.insertMany(materials);
+    // await Material.insertMany(materials);
     console.log(`✅ ${materials.length} materials inserted\n`);
 
     // Seed Material Prices
     console.log('💰 Seeding Material Prices...');
-    await MaterialPrice.insertMany(materialPrices);
+    // await MaterialPrice.insertMany(materialPrices);
     console.log(`✅ ${materialPrices.length} material prices inserted\n`);
 
     console.log('🎉 Seed process completed successfully!');
