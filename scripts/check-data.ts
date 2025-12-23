@@ -40,7 +40,7 @@ async function checkData() {
     await mongoose.disconnect();
     console.log('\nDatabase connection closed');
   } catch (error) {
-    console.error('Error checking data:', error.message);
+    console.error('Error checking data:', error instanceof Error ? error.message : String(error));
   }
 }
 

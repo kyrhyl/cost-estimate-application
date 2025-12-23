@@ -13,7 +13,7 @@ async function testConnection() {
     console.log('Connected to MongoDB Atlas successfully!');
     await mongoose.disconnect();
   } catch (error) {
-    console.error('Connection failed:', error.message);
+    console.error('Connection failed:', error instanceof Error ? error.message : String(error));
   }
 }
 
