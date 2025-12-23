@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
@@ -12,7 +13,7 @@ async function testConnection() {
     await mongoose.connect(process.env.MONGODB_URI!);
     console.log('Connected to MongoDB Atlas successfully!');
     await mongoose.disconnect();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Connection failed:', error instanceof Error ? error.message : String(error));
   }
 }

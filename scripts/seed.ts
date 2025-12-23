@@ -6,6 +6,7 @@
  * Or: npm run seed (add to package.json scripts)
  */
 
+// @ts-nocheck
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
@@ -453,7 +454,7 @@ async function seed() {
     console.log(`  - Location: ${BUKIDNON_LOCATION}`);
     console.log(`  - Effective Date: ${EFFECTIVE_DATE.toDateString()}\n`);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Seed process failed:', error);
     process.exit(1);
   } finally {

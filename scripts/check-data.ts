@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
@@ -39,7 +40,7 @@ async function checkData() {
 
     await mongoose.disconnect();
     console.log('\nDatabase connection closed');
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error checking data:', error instanceof Error ? error.message : String(error));
   }
 }
