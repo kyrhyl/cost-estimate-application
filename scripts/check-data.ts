@@ -3,7 +3,10 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables
 dotenv.config({ path: join(__dirname, '../.env.local') });
 
 import mongoose from 'mongoose';
@@ -14,7 +17,7 @@ import MaterialPrice from '../src/models/MaterialPrice';
 
 async function checkData() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI!);
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB Atlas\n');
 
     const laborCount = await LaborRate.countDocuments();
@@ -40,8 +43,9 @@ async function checkData() {
 
     await mongoose.disconnect();
     console.log('\nDatabase connection closed');
-  } catch (error: unknown) {
-    console.error('Error checking data:', error instanceof Error ? error.message : String(error));
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error checking data:', errorMessage);
   }
 }
 
